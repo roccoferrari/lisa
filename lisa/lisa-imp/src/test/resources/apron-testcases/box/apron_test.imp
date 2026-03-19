@@ -1,0 +1,12 @@
+class Main {
+    main() {
+        def x = 0;
+        def y = 10;
+
+        if (x < y) {
+            x = x + 1;
+        } else {
+            y = y - 1;
+        }
+    }
+}
