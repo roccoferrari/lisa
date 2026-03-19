@@ -667,12 +667,22 @@ public class Apron implements ValueDomain<Apron>, ValueLattice<Apron> {
 
     @Override
     public boolean isBottom() {
-        return equals(bottom());
+        try {
+            // delegate the computation to apron
+            return state.isBottom(manager);
+        } catch (ApronException e) {
+            throw new UnsupportedOperationException("Apron library crashed", e);
+        }
     }
 
     @Override
     public boolean isTop() {
-        return equals(top());
+        try {
+            // delegate the computation to apron
+            return state.isTop(manager);
+        } catch (ApronException e) {
+            throw new UnsupportedOperationException("Apron library crashed", e);
+        }
     }
 
     private Var toApronVar(Identifier id) {
