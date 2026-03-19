@@ -1,9 +1,21 @@
+// Apron's .jar files path
+def apronLibDir = "/Volumes/T7/universita/tesi/lt_informatica/codici/apron-dist/lib"
+
 dependencies {
 	// internal
 	api project(':lisa-sdk')
 	testImplementation project(':lisa-imp')
 
+    // Apron's import
+    implementation files("${apronLibDir}/apron.jar")
+    implementation files("${apronLibDir}/gmp.jar")
+
 	// testing
 	testImplementation 'nl.jqno.equalsverifier:equalsverifier:3.19.4'
 	testImplementation 'org.junit.jupiter:junit-jupiter-engine:5.9.1'
+}
+
+// Using .dylib during the tests
+tasks.withType(Test).configureEach {
+    systemProperty "java.library.path", apronLibDir
 }
