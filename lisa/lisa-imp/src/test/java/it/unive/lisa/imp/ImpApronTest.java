@@ -1,6 +1,7 @@
 package it.unive.lisa.imp;
 
 import static org.junit.jupiter.api.Assertions.fail;
+import it.unive.lisa.analysis.SimpleAbstractDomain;
 import it.unive.lisa.analysis.apron.Apron;
 import it.unive.lisa.outputs.JSONInputs;
 import it.unive.lisa.program.Program;
@@ -31,7 +32,9 @@ public class ImpApronTest extends AnalysisTestExecutor {
         conf.programFile = "apron_test.imp";
         conf.outputs.add(new JSONInputs());
 
-        // FIXME: conf.analysis
+        Apron apronValue = new Apron();
+
+        conf.analysis = new SimpleAbstractDomain<>(apronValue);
 
         perform(conf);
     }
