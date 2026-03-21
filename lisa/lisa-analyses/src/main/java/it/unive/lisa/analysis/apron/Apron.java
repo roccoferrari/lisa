@@ -33,11 +33,6 @@ public class Apron implements ValueDomain<Apron>, ValueLattice<Apron> {
      * */
 
     @Override
-    public boolean knowsIdentifier(Identifier id) {
-        return false;
-    }
-
-    @Override
     public Apron forgetIdentifier(Identifier id, ProgramPoint pp) throws SemanticException {
         return null;
     }
@@ -403,7 +398,6 @@ public class Apron implements ValueDomain<Apron>, ValueLattice<Apron> {
                     || op == ComparisonNe.INSTANCE) {
 
                 try {
-                    // Passiamo lo 'state' al metodo di supporto toApronComparison
                     return new Apron(state.state.meetCopy(manager, toApronComparison(state, bin)));
                 } catch (ApronException e) {
                     throw new UnsupportedOperationException("Apron library crashed", e);
@@ -436,6 +430,18 @@ public class Apron implements ValueDomain<Apron>, ValueLattice<Apron> {
         }
 
         return state;
+    }
+
+    @Override
+    public boolean knowsIdentifier(Identifier id) {
+        if (id == null || this.state == null)
+            return false;
+        try {
+            String var = id.getName();
+            return state.getEnvironment().hasVar(var);
+        } catch (Exception e) {
+            throw new UnsupportedOperationException("Apron library crashed during knowsIdentifier for var: " + id.getName(), e);
+        }
     }
 
     private Tcons1 toApronComparison(Apron state, BinaryExpression exp) throws ApronException {
