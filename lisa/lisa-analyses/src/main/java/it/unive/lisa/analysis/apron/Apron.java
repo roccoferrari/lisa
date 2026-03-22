@@ -42,28 +42,6 @@ public class Apron implements ValueDomain<Apron>, ValueLattice<Apron> {
         return new Apron(state);
     }
 
-    @Override
-    public Apron store(Identifier target, Identifier source) throws SemanticException {
-        return null;
-    }
-
-    @Override
-    public StructuredRepresentation representation() {
-        return new StringRepresentation(state.toString());
-    }
-
-
-    @Override
-    public Apron makeLattice() {
-        return null;
-    }
-
-    @Override
-    public Apron forgetIdentifiersIf(Predicate<Identifier> test, ProgramPoint pp) throws SemanticException {
-        // FIXME
-        return this;
-    }
-
     /*
      * END TODO METHODS SECTION
      * */
@@ -102,7 +80,7 @@ public class Apron implements ValueDomain<Apron>, ValueLattice<Apron> {
         PplGrid,
 
         /**
-         * The Parma Polyhedra libraryconvex polyhedra domain
+         * The Parma Polyhedra library convex polyhedra domain
          * Compile Apron with the specific flag for PPL set to 1 in order to use such domain.
          */
         PplPoly
@@ -169,9 +147,9 @@ public class Apron implements ValueDomain<Apron>, ValueLattice<Apron> {
 
             Var[] vars = apronExpression.getVars();
 
-            for (int i = 0; i < vars.length; i++)
-                if (!newState.getEnvironment().hasVar(vars[i])) {
-                    Var[] vars1 = {vars[i]};
+            for (Var var : vars)
+                if (!newState.getEnvironment().hasVar(var)) {
+                    Var[] vars1 = {var};
                     env = newState.getEnvironment().add(new Var[0], vars1);
                     newState = newState.changeEnvironmentCopy(manager, env, false);
                 }
@@ -191,7 +169,7 @@ public class Apron implements ValueDomain<Apron>, ValueLattice<Apron> {
         // Using Untyped.INSTANCE for do not depend on the frontend
         Constant zero = new Constant(Untyped.INSTANCE, 0, SyntheticLocation.INSTANCE);
 
-        // Creation of the binexprs >= and <=
+        // Creation of the bin expr >= and <=
         BinaryExpression geExpr = new BinaryExpression(Untyped.INSTANCE, id, zero, ComparisonGe.INSTANCE, SyntheticLocation.INSTANCE);
         BinaryExpression leExpr = new BinaryExpression(Untyped.INSTANCE, id, zero, ComparisonLe.INSTANCE, SyntheticLocation.INSTANCE);
 
@@ -577,7 +555,7 @@ public class Apron implements ValueDomain<Apron>, ValueLattice<Apron> {
     @Override
     public Apron lub(Apron other) throws SemanticException {
 
-        // we compute the least environment extending the this and other environment
+        // we compute the least environment extending this and other environment
         Environment lubEnv = state.getEnvironment().lce(other.state.getEnvironment());
         try {
             Abstract1 unifiedThis = state.changeEnvironmentCopy(manager, lubEnv, state.isBottom(manager));
@@ -741,6 +719,83 @@ public class Apron implements ValueDomain<Apron>, ValueLattice<Apron> {
             return new Apron(state.forgetCopy(manager, toApronVar(id), false));
         } catch (ApronException e) {
             throw new UnsupportedOperationException("Apron library crashed", e);
+        }
+    }
+
+    @Override
+    public StructuredRepresentation representation() {
+        return new StringRepresentation(state.toString());
+    }
+
+    @Override
+    public Apron store(Identifier target, Identifier source) throws SemanticException {
+        try {
+            // no assign
+            if (state.isBottom(manager)) {
+                return this;
+            }
+
+            apron.Environment env = state.getEnvironment();
+            String targetName = target.getName();
+            String sourceName = source.getName();
+
+            if (!env.hasVar(sourceName)) {
+                // variable doesn't exist in apron's env
+                throw new SemanticException("Error during store() metohd. Var '" + sourceName + "' does not exist in the current environment");
+            }
+
+            // Tree expr for var source
+            apron.Texpr1Intern expr = new apron.Texpr1Intern(env, new apron.Texpr1VarNode(sourceName));
+
+            // target <- expr - must be in the env
+            return new Apron(state.assignCopy(manager, targetName, expr, null));
+
+        } catch (Exception e) {
+            throw new SemanticException("Apron error during sotre() method:", e);
+        }
+    }
+
+
+    @Override
+    public Apron makeLattice() {
+        return new Apron();
+    }
+
+    @Override
+    public Apron forgetIdentifiersIf(Predicate<Identifier> test, ProgramPoint pp) throws SemanticException {
+        try {
+            if (state.isBottom(manager) || state.isTop(manager)) {
+                return this;
+            }
+
+            apron.Environment env = state.getEnvironment();
+            java.util.List<apron.Var> varsToRemove = new java.util.ArrayList<>();
+
+            // cicle on all apron vars
+            for (Var var : env.getVars()) {
+                String varName = var.toString();
+
+                Identifier tmpId = new it.unive.lisa.symbolic.value.Variable(
+                        it.unive.lisa.type.Untyped.INSTANCE,
+                        varName,
+                        pp.getLocation()
+                );
+
+                if (test.test(tmpId)) {
+                    varsToRemove.add(var);
+                }
+            }
+
+            if (varsToRemove.isEmpty()) {
+                return this;
+            }
+
+            // list -> array
+            apron.Var[] arrayToRemove = varsToRemove.toArray(new apron.Var[0]);
+            return new Apron(state.forgetCopy(manager, arrayToRemove, false));
+
+        } catch (Exception e) {
+            throw new SemanticException("Apron error in forgetIdentifiersIf() method", e);
         }
     }
 }
