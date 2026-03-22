@@ -33,11 +33,6 @@ public class Apron implements ValueDomain<Apron>, ValueLattice<Apron> {
      * */
 
     @Override
-    public Apron forgetIdentifier(Identifier id, ProgramPoint pp) throws SemanticException {
-        return null;
-    }
-
-    @Override
     public Apron pushScope(ScopeToken token, ProgramPoint pp) throws SemanticException {
         return new Apron(state);
     }
@@ -706,24 +701,44 @@ public class Apron implements ValueDomain<Apron>, ValueLattice<Apron> {
 
     @Override
     public Apron forgetIdentifiers(Iterable<Identifier> ids, ProgramPoint pp) throws SemanticException {
-        // Ids list to forget
-        java.util.List<apron.Var> varsToForget = new java.util.ArrayList<>();
+        try {
+            if (state.isBottom(manager) || state.isTop(manager)) {
+                return this;
+            }
 
-        // Check the identifiers passed
-        for(Identifier id : ids)
-            if (containsIdentifier(id))
-                varsToForget.add(toApronVar(id));
+            // extract env
+            apron.Environment env = state.getEnvironment();
+            java.util.List<apron.Var> varsToForget = new java.util.ArrayList<>();
 
-        // If no ids is forgettable
-        if (varsToForget.isEmpty())
+            for (Identifier id : ids) {
+                apron.Var apronVar = toApronVar(id);
+
+                if (env.hasVar(apronVar.toString())) {
+                    varsToForget.add(apronVar);
+                }
+            }
+
+            if (varsToForget.isEmpty()) {
+                return this;
+            }
+
+            // list -> array: required from apron
+            apron.Var[] varsArray = varsToForget.toArray(new apron.Var[0]);
+
+            return new Apron(state.forgetCopy(manager, varsArray, false));
+
+        } catch (ApronException e) {
+            throw new UnsupportedOperationException("Apron library crashed during forgetIdentifiers", e);
+        }
+    }
+
+    @Override
+    public Apron forgetIdentifier(Identifier id, ProgramPoint pp) throws SemanticException {
+        if (!containsIdentifier(id))
             return this;
 
         try {
-            // Convers the List into an Array (required from Apron API)
-            apron.Var[] varsArray = varsToForget.toArray(new apron.Var[0]);
-
-            // Apron forget all variables
-            return new Apron(state.forgetCopy(manager, varsArray, false));
+            return new Apron(state.forgetCopy(manager, toApronVar(id), false));
         } catch (ApronException e) {
             throw new UnsupportedOperationException("Apron library crashed", e);
         }
