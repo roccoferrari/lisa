@@ -792,7 +792,10 @@ public class Apron implements ValueDomain<Apron>, ValueLattice<Apron> {
 
             // list -> array
             apron.Var[] arrayToRemove = varsToRemove.toArray(new apron.Var[0]);
-            return new Apron(state.forgetCopy(manager, arrayToRemove, false));
+
+            apron.Environment newEnv = env.remove(arrayToRemove);
+
+            return new Apron(state.changeEnvironmentCopy(manager, newEnv, false));
 
         } catch (Exception e) {
             throw new SemanticException("Apron error in forgetIdentifiersIf() method", e);
