@@ -1,5 +1,79 @@
-// Apron's .jar files path
-def apronLibDir = "/Volumes/T7/universita/tesi/lt_informatica/codici/apron-dist/lib"
+import org.gradle.internal.os.OperatingSystem
+
+// lisa/lisa/lisa-analysis/apron/
+def apronBaseDir = file("${projectDir}/apron")
+def apronSrcDir = file("${apronBaseDir}/apron-src")
+def apronDistDir = file("${apronBaseDir}/apron-dist")
+def apronLibDir = file("${apronDistDir}/lib")
+
+// Apron cloning in ./apron/apron-src
+task cloneApron(type: Exec) {
+    onlyIf { !apronSrcDir.exists() }
+    commandLine 'git', 'clone', 'https://github.com/antoinemine/apron.git', apronSrcDir
+
+    // Delete .git folder to prevent conflicts with LiSA repo
+    doLast {
+        delete("${apronSrcDir}/.git")
+    }
+}
+
+// Simple setup (no ppl, pplite, ocaml, ...)
+task configureApron(type: Exec) {
+    dependsOn cloneApron
+    workingDir apronSrcDir
+    commandLine './configure', '-no-ppl', '-no-pplite'
+}
+
+// Compiling Makefile
+task makeApron(type: Exec) {
+    dependsOn configureApron
+    workingDir apronSrcDir
+    commandLine 'make'
+}
+
+// Copy of useful files in /apron-dist/lib/
+task apronOrganize(type: Copy) {
+    dependsOn makeApron
+
+    from(apronSrcDir) {
+        include '**/*.jar'
+        include '**/*.so'
+        include '**/*.dylib'
+        include '**/*.jnilib'
+    }
+    into apronLibDir
+
+    includeEmptyDirs = false
+    eachFile { FileCopyDetails details ->
+        details.path = details.name
+    }
+}
+
+// SymLinks
+task setupNativeLibraries {
+    dependsOn apronOrganize
+
+    doLast {
+        if (OperatingSystem.current().isMacOsX()) {
+            fileTree(dir: apronLibDir, include: '**/**.so').each { File soFile ->
+                def baseName = soFile.name.take(soFile.name.lastIndexOf('.'))
+                def dylibFile = new File(soFile.parentFile, "${baseName}.dylib")
+                def jnilibFile = new File(soFile.parentFile, "${baseName}.jnilib")
+                if (!dylibFile.exists()) {
+                    ant.symlink(resource: soFile.absolutePath, link: dylibFile.absolutePath)
+                }
+                if (!jnilibFile.exists()) {
+                    ant.symlink(resource: soFile.absolutePath, link: jnilibFile.absolutePath)
+                }
+            }
+        }
+    }
+}
+
+// Link to Gradle life cycle
+tasks.named('compileJava') {
+    dependsOn setupNativeLibraries
+}
 
 dependencies {
 	// internal
@@ -17,5 +91,24 @@ dependencies {
 
 // Using .dylib during the tests
 tasks.withType(Test).configureEach {
-    systemProperty "java.library.path", apronLibDir
+    systemProperty "java.library.path", apronLibDir.absolutePath
+
+    // OS path for C dependencies
+    environment "DYLD_LIBRARY_PATH", apronLibDir.absolutePath
+    environment "LD_LIBRARY_PATH", apronLibDir.absolutePath
+
+    testLogging {
+        events "passed", "skipped", "failed", "standardOut", "standardError"
+        showStandardStreams = true
+        exceptionFormat = "full"
+    }
+}
+
+clean {
+    delete apronBaseDir
+}
+
+// Expose Apron to other modules (es. for testing)
+ext {
+    exposedApronLibDir = apronLibDir.absolutePath
 }
