@@ -21,6 +21,12 @@ task cloneApron(type: Exec) {
 task configureApron(type: Exec) {
     dependsOn cloneApron
     workingDir apronSrcDir
+
+    // Java home used by gradle
+    def javaHome = System.getProperty("java.home")
+
+    environment "JAVA_HOME", javaHome
+    environment "PATH", "${javaHome}/bin:${System.env.PATH}"
     commandLine './configure', '-no-ppl', '-no-pplite'
 }
 
@@ -46,6 +52,18 @@ task apronOrganize(type: Copy) {
     includeEmptyDirs = false
     eachFile { FileCopyDetails details ->
         details.path = details.name
+    }
+
+    doLast {
+        def apronJar = file("${apronLibDir}/apron.jar")
+        def gmpJar = file("${apronLibDir}/gmp.jar")
+
+        if (!apronJar.exists() || !gmpJar.exists()) {
+            throw new GradleException(
+                    "ERROR: .jar files not generated\n" +
+                            "Make sure you have 'openjdk-xx-jdk' installed and that JAVA_HOME is correct"
+            )
+        }
     }
 }
 
