@@ -24,7 +24,7 @@ import java.util.function.Predicate;
 
 public class Apron implements ValueDomain<Apron>, ValueLattice<Apron> {
 
-    private static Manager manager;
+    private static Manager manager = new apron.Box();
 
     final Abstract1 state;
 
