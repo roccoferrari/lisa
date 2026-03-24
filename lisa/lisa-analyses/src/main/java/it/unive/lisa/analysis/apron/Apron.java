@@ -101,12 +101,11 @@ public class Apron implements ValueDomain<Apron>, ValueLattice<Apron> {
                 manager = new PolkaEq();
                 break;
             // ppl needed
-//            case PplGrid:
-//                manager = new PplGrid();
-//                break;
-//            case PplPoly:
-//                manager = new PplPoly(false);
-//                break;
+            case PplGrid:
+            case PplPoly:
+                throw new UnsupportedOperationException(
+                        numericalDomain + "domain require PPL library, which is not included in the current Apron compilation"
+                );
             default:
                 throw new UnsupportedOperationException("Numerical domain " + numericalDomain + " unknown in Apron");
         }
