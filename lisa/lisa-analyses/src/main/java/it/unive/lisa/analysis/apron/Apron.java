@@ -802,4 +802,21 @@ public class Apron implements ValueDomain<Apron>, ValueLattice<Apron> {
             throw new SemanticException("Apron error in forgetIdentifiersIf() method", e);
         }
     }
+
+    @Override
+    public int hashCode() {
+        return java.util.Objects.hash(state);
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj)
+            return true;
+        if (obj == null)
+            return false;
+        if (getClass() != obj.getClass())
+            return false;
+        Apron other = (Apron) obj;
+        return java.util.Objects.equals(this.state, other.state);
+    }
 }
