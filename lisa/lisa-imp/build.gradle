@@ -27,3 +27,21 @@ sourcesJar {
 checkstyleMain {
 	exclude 'it/unive/lisa/imp/antlr/*.java'
 }
+
+tasks.withType(Test).configureEach {
+    useJUnitPlatform()
+
+    // Apron api
+    def apronPath = project(':lisa-analyses').ext.exposedApronLibDir
+
+    systemProperty "java.library.path", apronPath
+    environment "DYLD_LIBRARY_PATH", apronPath
+    environment "LD_LIBRARY_PATH", apronPath
+
+    testLogging {
+        events "passed", "skipped", "failed", "standardOut", "standardError"
+        showStandardStreams = true
+        exceptionFormat = "full"
+    }
+
+}
