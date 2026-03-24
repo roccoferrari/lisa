@@ -6,6 +6,29 @@ def apronSrcDir = file("${apronBaseDir}/apron-src")
 def apronDistDir = file("${apronBaseDir}/apron-dist")
 def apronLibDir = file("${apronDistDir}/lib")
 
+task checkSystemDependencies {
+    doFirst {
+        def isMac = OperatingSystem.current().isMacOsX()
+        def isLinux = OperatingSystem.current().isLinux()
+
+        // verify librery presence (gmp, mpfr)
+        try {
+            if(isLinux) {
+                exec { commandLine 'ld', '-lgmp', '-lmpfr', '--verbose'; ignoreExitValue = false; standardOutput = new ByteArrayOutputStream() }
+            } else if (isMac) {
+                if (!file("/opt/homebrew/include/gmp.h").exists() && !file("/usr/local/include/gmp.h").exists()) {
+                    throw new Exception("GMP not found")
+                }
+            }
+        } catch (Exception e) {
+            def installCmd = isMac ? "brew install gmp mpfr" : "sudo apt install libgmp-dev libmpfr-dev"
+            throw new GradleException(
+                    "[-] MISSING DEPENDENCIES: Apron requires the GMP and MPFR system libraries.\\n\" +\n" + "\"[*] To resolve, run the command: ${installCmd}"
+            )
+        }
+    }
+}
+
 // Apron cloning in ./apron/apron-src
 task cloneApron(type: Exec) {
     onlyIf { !apronSrcDir.exists() }
@@ -20,6 +43,7 @@ task cloneApron(type: Exec) {
 // Simple setup (no ppl, pplite, ocaml, ...)
 task configureApron(type: Exec) {
     dependsOn cloneApron
+    dependsOn checkSystemDependencies
     workingDir apronSrcDir
 
     // Java home used by gradle
