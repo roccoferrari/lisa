@@ -46,11 +46,34 @@ task configureApron(type: Exec) {
     dependsOn checkSystemDependencies
     workingDir apronSrcDir
 
-    // Java home used by gradle
-    def javaHome = System.getProperty("java.home")
+    // Select JAVA_HOME depending on OS
+    def javaHome = ""
+    def jniIncludeOS = ""
 
+    if (OperatingSystem.current().isMacOsX()) {
+        // MacOS
+        def brewPath = "brew --prefix openjdk@17".execute().text.trim()
+        if (!brewPath.isEmpty() && file("${brewPath}/libexec/openjdk.jdk/Contents/Home").exists()) {
+            javaHome = "${brewPath}/libexec/openjdk.jdk/Contents/Home"
+        } else {
+            javaHome = "/usr/libexec/java_home -v 17".execute().text.trim()
+        }
+        jniIncludeOS = "darwin"
+    } else if (OperatingSystem.current().isLinux()) {
+        // linux
+        javaHome = System.getProperty("java.home")
+        jniIncludeOS = "linux"
+    }
+
+    // export venv
     environment "JAVA_HOME", javaHome
+
+    // Generic jni folder
+    environment "CFLAGS", "-I${javaHome}/include -I${javaHome}/include/${jniIncludeOS}"
+
+    // find javac
     environment "PATH", "${javaHome}/bin:${System.env.PATH}"
+
     commandLine './configure', '-no-ppl', '-no-pplite'
 }
 
