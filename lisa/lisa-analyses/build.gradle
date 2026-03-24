@@ -23,7 +23,7 @@ task checkSystemDependencies {
         } catch (Exception e) {
             def installCmd = isMac ? "brew install gmp mpfr" : "sudo apt install libgmp-dev libmpfr-dev"
             throw new GradleException(
-                    "[-] MISSING DEPENDENCIES: Apron requires the GMP and MPFR system libraries.\\n\" +\n" + "\"[*] To resolve, run the command: ${installCmd}"
+                    "[-] MISSING DEPENDENCIES: Apron requires the GMP and MPFR system libraries.\n" + "[*] To resolve, run the command: ${installCmd}"
             )
         }
     }
