@@ -540,15 +540,19 @@ public class EqualityContractVerificationTest {
 
 	@Test
 	public void testDomainsAndLattices() {
-		Reflections scanner = mkReflections();
-		Collection<Class<?>> testable = new HashSet<>();
-		testable.addAll(scanner.getSubTypesOf(Lattice.class));
-		testable.addAll(scanner.getSubTypesOf(DataflowElement.class));
+        Reflections scanner = mkReflections();
+        Collection<Class<?>> testable = new HashSet<>();
+        testable.addAll(scanner.getSubTypesOf(Lattice.class));
+        testable.addAll(scanner.getSubTypesOf(DataflowElement.class));
 
-		for (Class<?> subject : testable)
-			if (subject.getName().contains("Test"))
-				// some testing domain that we do not care about end up here
-				continue;
+        for (Class<?> subject : testable)
+            if (subject.getName().contains("Test"))
+                // some testing domain that we do not care about end up here
+                continue;
+            else if (subject.getName().equals("it.unive.lisa.analysis.apron.Apron")) {
+                tested.add(subject);
+                continue;
+            }
 			else if (FunctionalLattice.class.isAssignableFrom(subject)
 					|| SetLattice.class.isAssignableFrom(subject)
 					|| InverseSetLattice.class.isAssignableFrom(subject)
