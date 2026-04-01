@@ -94,7 +94,7 @@ public class SemanticsSanityTest {
 					&& !CompoundState.class.isAssignableFrom(clazz)
 					// some testing domain that we do not care about end up here
 					&& !clazz.getName().contains("Test")
-                    && !clazz.getName().equals("it.unive.lisa.analysis.apron.Apron")) {
+					&& !clazz.getName().equals("it.unive.lisa.analysis.apron.Apron")) {
 				total++;
 				for (Constructor<?> c : clazz.getConstructors()) {
 					if (c.getParameterCount() == 0)
