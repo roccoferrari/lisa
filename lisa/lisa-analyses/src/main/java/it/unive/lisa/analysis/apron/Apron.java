@@ -228,8 +228,32 @@ public class Apron
 					newState = newState.changeEnvironmentCopy(manager, env, false);
 				}
 
-			return new Apron(newState.assignCopy(manager, variable,
+			// DEBUG
+			if (expression.toString().contains("/")) {
+				System.out.println("[DEBUG APRON] Assigning to Apron: variable: " + variable);
+				System.out.println("[DEBUG APRON] Expression translated to C: " + apronExpression.toString());
+			}
+
+			Apron result = new Apron(newState.assignCopy(manager, variable,
 					new Texpr1Intern(newState.getEnvironment(), apronExpression), null));
+
+			// DEBUG
+			if (expression.toString().contains("/")) {
+				System.out.println("[DEBUG APRON] Assign result: " + result.state.toString());
+
+				try {
+					apron.Interval varBound = result.state.getBound(manager, variable.toString());
+
+					System.out.println("[DEBUG APRON] Interval: '" + variable + "' is: " + varBound.toString());
+					System.out.println("[DEBUG APRON] Interval isBottom(): " + varBound.isBottom());
+					System.out.println("[DEBUG APRON] Interval isTop(): " + varBound.isTop());
+				} catch (Exception e) {
+					System.out.println("[DEBUG APRON] Impossible retrieve limits: " + e.getMessage());
+				}
+				System.out.println("\n");
+			}
+
+			return result;
 
 		} catch (ApronException e) {
 			throw new UnsupportedOperationException("Apron library crashed", e);
@@ -327,6 +351,14 @@ public class Apron
 				if (!canBeConvertedToApronOperator(bin.getOperator()))
 					// we are not able to translate the expression
 					return null;
+
+				// DEBUG
+				if (bin.getOperator() == NumericNonOverflowingDiv.INSTANCE) {
+					System.out.println("\n[DEBUG APRON] left: " + bin.getLeft() + " (Class: "
+							+ bin.getLeft().getClass().getSimpleName() + ")");
+					System.out.println("[DEBUG APRON] right: " + bin.getRight() + " (Class: "
+							+ bin.getRight().getClass().getSimpleName() + ")");
+				}
 
 				return new Texpr1BinNode(toApronOperator(bin.getOperator()), rewrittenLeft, rewrittenRight);
 			}
