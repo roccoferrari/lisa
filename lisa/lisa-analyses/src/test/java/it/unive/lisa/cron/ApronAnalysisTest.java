@@ -19,7 +19,7 @@ public class ApronAnalysisTest
 
 		CronConfiguration conf = new CronConfiguration();
 		conf.outputs.add(new JSONResults<>());
-		// conf.outputs.add(new HtmlResults<>(true));
+		conf.outputs.add(new HtmlResults<>(true));
 		// conf.forceUpdate = true;
 		conf.analysis = DefaultConfiguration.simpleDomain(
 				DefaultConfiguration.defaultHeapDomain(),
@@ -46,6 +46,25 @@ public class ApronAnalysisTest
 				DefaultConfiguration.defaultTypeDomain());
 		conf.testDir = "numeric/apron-octagon";
 		conf.programFile = "octagon.imp";
+		perform(conf);
+	}
+
+	@Test
+	public void testApronPoly() {
+		Apron.loadLibrary();
+
+		Apron.setManager(Apron.ApronDomain.Polka);
+
+		CronConfiguration conf = new CronConfiguration();
+		conf.outputs.add(new JSONResults<>());
+		conf.outputs.add(new HtmlResults<>(true));
+		// conf.forceUpdate = true;
+		conf.analysis = DefaultConfiguration.simpleDomain(
+				DefaultConfiguration.defaultHeapDomain(),
+				new Apron(),
+				DefaultConfiguration.defaultTypeDomain());
+		conf.testDir = "numeric/apron-poly";
+		conf.programFile = "poly.imp";
 		perform(conf);
 	}
 }
