@@ -148,6 +148,33 @@ class tutorial {
 
     // Arithmetic Operations
 
+    arithmetic_division_by_zero() {
+        def x = 10;
+        def y = 0;
+        // Expected: Bottom
+        def z = x / y;
+        return z;
+    }
+
+    direct_div_by_zero() {
+        def a = 2 / 0;
+        return a;
+    }
+
+    interval_div_by_zero(flag) {
+        def a = 2;
+        def b = 0;
+
+        if (flag) {
+            b = 0;
+        } else {
+            b = 2;
+        }
+
+        def c = a / b;
+        return c;
+    }
+
     arithmetic_multiplication() {
         def x = 5;
         def y = 10;
@@ -167,13 +194,7 @@ class tutorial {
         return z;
     }
 
-    arithmetic_division_by_zero() {
-        def x = 10;
-        def y = 0;
-        // Expected: Bottom
-        def z = x / y;
-        return z;
-    }
+
 
     // Logical Operators
 
@@ -215,4 +236,5 @@ class tutorial {
         // Expected: x = 5
         return x;
     }
+
 }
