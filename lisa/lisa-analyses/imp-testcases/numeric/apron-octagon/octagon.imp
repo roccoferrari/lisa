@@ -2,7 +2,7 @@ class tutorial {
 
     // Div by zero
 
-    sum_div_by_zero() {
+    div_by_zero_1() {
         def x = 10;
         def y = 0;
         def z = 15;
@@ -10,7 +10,7 @@ class tutorial {
         return a;
     }
 
-    div_by_zero() {
+    div_by_zero_2() {
         def x = 10;
         def y = 0;
         def z = 15;
@@ -18,7 +18,7 @@ class tutorial {
         return a;
     }
 
-    div_by_0_2(flag) {
+    div_by_zero_3(flag) {
         def a = 2;
         def b = 0;
 
@@ -33,14 +33,14 @@ class tutorial {
 
     // Relational tracking
 
-    basic_equality() {
+    relation_1() {
         def x = 10;
         def y = x;
         // Expected: Octagon tracks x - y == 0
         return y;
     }
 
-    basic_offset() {
+    relation_2() {
         def a = 5;
         def b = a + 3;
         // Expected: Octagon tracks b - a == 3
@@ -49,7 +49,7 @@ class tutorial {
 
     // Loops and relational invariants
 
-    loop_preserve_offset() {
+    relation_3() {
         def i = 0;
         def j = 5;
         // Expected: j - i == 5 remains invariant throughout the loop
@@ -60,7 +60,7 @@ class tutorial {
         return j;
     }
 
-    loop_preserve_sum() {
+    relation_4() {
         def x = 0;
         def y = 100;
         // Expected: x + y == 100 remains invariant
@@ -71,7 +71,7 @@ class tutorial {
         return y;
     }
 
-    loop_relational_widening() {
+    relation_5() {
         def x = 0;
         def y = 0;
         while (x < 1000) {
@@ -83,19 +83,19 @@ class tutorial {
 
     // Limits of representability
 
-    three_variables_loss(x, y) {
+    relation_6(x, y) {
         def z = x + y;
         // Expected: The domain cannot express z - x - y == 0 (more than 2 vars)
         return z;
     }
 
-    non_unit_coefficients(x) {
+    relation_7(x) {
         def y = 2 * x;
         // Expected: Cannot track y - 2x == 0 (coeff. is not +/- 1)
         return y;
     }
 
-    non_linear_loss(x) {
+    relation_8(x) {
         def y = x * x;
         // Expected: Total loss of relational precision (not linear)
         return y;
@@ -103,7 +103,7 @@ class tutorial {
 
     // Branching and LUB
 
-    branching_join_range(flag) {
+    branching_1(flag) {
         def x = 0;
         def y = 0;
         if (flag) {
@@ -117,7 +117,7 @@ class tutorial {
         return y;
     }
 
-    branching_join_shape(flag) {
+    branching_2(flag) {
         def a = 0;
         def b = 0;
         if (flag) {
@@ -133,7 +133,7 @@ class tutorial {
 
     // Closure and Implicit Relations
 
-    closure(x, y, z) {
+    dead_code_1(x, y, z) {
         def result = 0;
         if (x <= y) {
             if (y <= z) {
@@ -148,7 +148,7 @@ class tutorial {
         return result;
     }
 
-    relational_dead_code() {
+    dead_code_2() {
         def x = 10;
         def y = x + 5;
         def result = 0;

@@ -2,20 +2,20 @@ class tutorial {
 
     // Relational tracking
 
-    non_unit_expr() {
+    relation_1() {
         def x = 10;
         def y = 3 * x;
         // Expected: Poly tracks y - 3x == 0
         return y;
     }
 
-    three_variables_track(x, y) {
+    relation_2(x, y) {
         def z = x + y;
         // Expected: Poly tracks z - x - y == 0
         return z;
     }
 
-    complex_linear_combination() {
+    relation_3() {
         def a = 5;
         def b = 10;
         def c = 2 * a + 3 * b - 5;
@@ -25,7 +25,7 @@ class tutorial {
 
     // Loops and relational invariants
 
-    loop_preserve_multiplier() {
+    relation_4() {
         def i = 0;
         def j = 0;
         while (i < 100) {
@@ -36,7 +36,7 @@ class tutorial {
         return j;
     }
 
-    loop_preserve_plane() {
+    relation_5() {
         def x = 0;
         def y = 0;
         def z = 0;
@@ -50,20 +50,20 @@ class tutorial {
 
     // Limits of representability (Non-linear operations)
 
-    non_linear_squaring(x) {
+    relation_6(x) {
         def y = x * x;
         // Expected: Total loss of relational precision
         return y;
     }
 
-    non_linear_multiplication(x, y) {
+    relation_7(x, y) {
         def z = x * y;
         return z;
     }
 
     // Branching and lub
 
-    branching_join(flag) {
+    branching_1(flag) {
         def x = 0;
         def y = 0;
         if (flag) {
@@ -77,16 +77,18 @@ class tutorial {
         return z;
     }
 
-    branching_join_triangle(flag1, flag2) {
+    branching_2(flag1, flag2) {
         def x = 0;
         def y = 0;
         if (flag1) {
             x = 10; y = 0;
         } else {
             if (flag2) {
-                x = 0; y = 10;
+                x = 0;
+                y = 10;
             } else {
-                x = 0; y = 0;
+                x = 0;
+                y = 0;
             }
         }
         // Expected Join: Infers the region
@@ -95,7 +97,42 @@ class tutorial {
 
     // Closure and Implicit Relations
 
-    complex_dead_code() {
+    dead_code_1() {
+        def a = 10;
+        def b = 0;
+
+        if(a != 30)
+            b = 10;
+        else
+            b = -10;
+        return b;
+    }
+
+    dead_code_2() {
+        def a = 10;
+        def b = 0;
+        def c = 3 * a;
+
+        if(c != 30)
+            b = 10;
+        else
+            b = -10;
+        return b;
+    }
+
+    dead_code_3() {
+        def a = 10;
+        def b = 0;
+        def c = 3 * a;
+
+        if(c > 30)
+            b = 10;
+        else
+            b = -10;
+        return b;
+    }
+
+    dead_code_4() {
         def x = 10;
         def y = 2 * x;
         def z = x + y; // z=30, and z = 3x
@@ -110,7 +147,7 @@ class tutorial {
         return result;
     }
 
-    multi_variable(a, b, c, d) {
+    dead_code_5(a, b, c, d) {
         def result = 0;
         if (a <= b + c) {
             if (b + c <= d) {

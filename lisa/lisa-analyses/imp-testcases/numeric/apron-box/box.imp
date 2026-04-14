@@ -8,19 +8,38 @@ class tutorial {
         return b;
     }
 
-    if_else(a) {
+    branching_1(a) {
         def b = 3;
-        if(a < 4) {
-            b = 3;
+        if(b < 2) {
+            b = -33;
         } else {
             b = 5;
         }
         return b;
     }
 
+    branching_2(flag) {
+        def b = 0;
+
+        if (flag) {
+            b = 0;
+        } else {
+            b = 10;
+        }
+
+        def result = 0;
+
+        if (b < 5) {
+            result = b;
+        } else {
+            result = -1;
+        }
+        return result;
+    }
+
     // Widening
 
-    while_widening_up_million() {
+    widening_1() {
         def i = 0;
         // Expected without narrowing: i >= +inf
         while (i < 1000000) {
@@ -29,7 +48,7 @@ class tutorial {
         return i;
     }
 
-    while_widening_up_four() {
+    widening_2() {
         def i = 0;
         // Threshold test depending on unroll limit:
         // Expected: i = 4 (if unrolled) or i >= +inf (if widened early)
@@ -39,7 +58,7 @@ class tutorial {
         return i;
     }
 
-    while_widening_down_million() {
+    widening_3() {
         def j = 100;
         // Expected without narrowing: j <= -inf
         while (j > -1000000) {
@@ -48,7 +67,7 @@ class tutorial {
         return j;
     }
 
-    while_widening_down_ns(j) {
+    widening_4(j) {
         j = 100;
         // Expected: j = 96 (if unrolled) or j <= -inf (if widened)
         while (j > 96) {
@@ -59,7 +78,7 @@ class tutorial {
 
     // Box behavior with relations
 
-    box_limits() {
+    box_1() {
         def x = 0;
         def y = 5;
         while (x < 100) {
@@ -70,7 +89,7 @@ class tutorial {
         return y;
     }
 
-    relational_conditions(x, y) {
+    box_2(x, y) {
         // Tests if the analyzer can refine variables when compared to each other
         if (x < y) {
             x = x + 1;
@@ -82,7 +101,7 @@ class tutorial {
 
     // Branching and LUB
 
-    branching_lub() {
+    lub_1() {
         def a = 0;
         def limit = 500;
         while (a < limit) {
@@ -95,7 +114,7 @@ class tutorial {
         return a;
     }
 
-    endless_lub() {
+    lub_2() {
         // Branching with dead code - endless loop
         // Expected: Bottom (Unreachable return)
         def a = 0;
@@ -112,7 +131,7 @@ class tutorial {
 
     // Dead Code and Narrowing
 
-    dead_code_narrowing() {
+    dead_code_1() {
         def x = 0;
         while (x < 100) {
             x = x + 1;
@@ -130,7 +149,7 @@ class tutorial {
 
     // Nested Loops Stress Test
 
-    nested_while_stress() {
+    nested_while() {
         def outer = 0;
         def inner = 0;
         def max_out = 50;
@@ -148,7 +167,7 @@ class tutorial {
 
     // Arithmetic Operations
 
-    arithmetic_division_by_zero() {
+    div_by_zero_1() {
         def x = 10;
         def y = 0;
         // Expected: Bottom
@@ -156,12 +175,12 @@ class tutorial {
         return z;
     }
 
-    direct_div_by_zero() {
+    div_by_zero_2() {
         def a = 2 / 0;
         return a;
     }
 
-    interval_div_by_zero(flag) {
+    div_by_zero_3(flag) {
         def a = 2;
         def b = 0;
 
@@ -231,7 +250,7 @@ class tutorial {
             x = x + 1;
         }
         // At this point x has accumulated uncertainty from widening
-        // The following assignment should reset the abstraction entirely
+        // The following assignment should reset the abstraction
         x = 5;
         // Expected: x = 5
         return x;
