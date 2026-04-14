@@ -19,7 +19,7 @@ public class ApronAnalysisTest
 
 		CronConfiguration conf = new CronConfiguration();
 		conf.outputs.add(new JSONResults<>());
-		conf.outputs.add(new HtmlResults<>(true));
+		// conf.outputs.add(new HtmlResults<>(true));
 		// conf.forceUpdate = true;
 		conf.analysis = DefaultConfiguration.simpleDomain(
 				DefaultConfiguration.defaultHeapDomain(),
@@ -54,7 +54,6 @@ public class ApronAnalysisTest
 		Apron.loadLibrary();
 
 		Apron.setManager(Apron.ApronDomain.Polka);
-
 		CronConfiguration conf = new CronConfiguration();
 		conf.outputs.add(new JSONResults<>());
 		conf.outputs.add(new HtmlResults<>(true));
