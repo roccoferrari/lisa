@@ -493,12 +493,24 @@ public class Apron
 			BinaryOperator op = bin.getOperator();
 			Apron left, right;
 
+			if (op == ComparisonNe.INSTANCE) {
+				// A!=B -> (A<B) OR (A>B)
+				BinaryExpression lt = new BinaryExpression(bin.getStaticType(), bin.getLeft(), bin.getRight(),
+						ComparisonLt.INSTANCE, bin.getCodeLocation());
+				BinaryExpression gt = new BinaryExpression(bin.getStaticType(), bin.getLeft(), bin.getRight(),
+						ComparisonGt.INSTANCE, bin.getCodeLocation());
+				BinaryExpression or = new BinaryExpression(bin.getStaticType(), lt, gt, LogicalOr.INSTANCE,
+						bin.getCodeLocation());
+
+				return assume(state, or, src, dest, oracle);
+			}
+
 			if (op == ComparisonEq.INSTANCE
 					|| op == ComparisonGe.INSTANCE
 					|| op == ComparisonGt.INSTANCE
 					|| op == ComparisonLe.INSTANCE
 					|| op == ComparisonLt.INSTANCE
-					|| op == ComparisonNe.INSTANCE) {
+			/* || op == ComparisonNe.INSTANCE */) {
 
 				try {
 					return new Apron(state.state.meetCopy(manager, toApronComparison(state, bin)));
@@ -549,33 +561,95 @@ public class Apron
 		}
 	}
 
+//	private Tcons1 toApronComparison(
+//			Apron state,
+//			BinaryExpression exp)
+//			throws ApronException {
+//		// Apron supports only "exp <comparison> 0", so we need to move
+//		// everything on the left node
+//		SymbolicExpression combinedExpr = new BinaryExpression(exp.getStaticType(), exp.getLeft(), exp.getRight(),
+//				NumericNonOverflowingSub.INSTANCE, exp.getCodeLocation());
+//		BinaryOperator op = exp.getOperator();
+//		if (op == ComparisonGt.INSTANCE
+//				|| op == ComparisonGe.INSTANCE
+//				|| op == ComparisonNe.INSTANCE
+//				|| op == ComparisonEq.INSTANCE) {
+//			Texpr1Node apronExpression = toApronExpression(combinedExpr);
+//			if (apronExpression != null)
+//				return new Tcons1(state.state.getEnvironment(), toApronOperator(exp.getOperator()), apronExpression);
+//			else
+//				throw new UnsupportedOperationException(
+//						"Comparison operator " + exp.getOperator() + " not yet supported");
+//		} else if (op == ComparisonLe.INSTANCE)
+//			return toApronComparison(state, new BinaryExpression(exp.getStaticType(), exp.getRight(), exp.getLeft(),
+//					ComparisonGe.INSTANCE, exp.getCodeLocation()));
+//		else if (op == ComparisonLt.INSTANCE)
+//			return toApronComparison(state, new BinaryExpression(exp.getStaticType(), exp.getRight(), exp.getLeft(),
+//					ComparisonGt.INSTANCE, exp.getCodeLocation()));
+//		else
+//			throw new UnsupportedOperationException("Comparison operator " + exp.getOperator() + " not yet supported");
+//	}
+
 	private Tcons1 toApronComparison(
 			Apron state,
 			BinaryExpression exp)
 			throws ApronException {
-		// Apron supports only "exp <comparison> 0", so we need to move
-		// everything on the left node
-		SymbolicExpression combinedExpr = new BinaryExpression(exp.getStaticType(), exp.getLeft(), exp.getRight(),
-				NumericNonOverflowingSub.INSTANCE, exp.getCodeLocation());
 		BinaryOperator op = exp.getOperator();
-		if (op == ComparisonGt.INSTANCE
-				|| op == ComparisonGe.INSTANCE
-				|| op == ComparisonNe.INSTANCE
-				|| op == ComparisonEq.INSTANCE) {
-			Texpr1Node apronExpression = toApronExpression(combinedExpr);
-			if (apronExpression != null)
-				return new Tcons1(state.state.getEnvironment(), toApronOperator(exp.getOperator()), apronExpression);
-			else
-				throw new UnsupportedOperationException(
-						"Comparison operator " + exp.getOperator() + " not yet supported");
-		} else if (op == ComparisonLe.INSTANCE)
-			return toApronComparison(state, new BinaryExpression(exp.getStaticType(), exp.getRight(), exp.getLeft(),
-					ComparisonGe.INSTANCE, exp.getCodeLocation()));
-		else if (op == ComparisonLt.INSTANCE)
-			return toApronComparison(state, new BinaryExpression(exp.getStaticType(), exp.getRight(), exp.getLeft(),
-					ComparisonGt.INSTANCE, exp.getCodeLocation()));
-		else
-			throw new UnsupportedOperationException("Comparison operator " + exp.getOperator() + " not yet supported");
+
+		// cases < and <= transformed into > and >= logic
+		if (op == ComparisonLe.INSTANCE) {
+			BinaryExpression newExpr = new BinaryExpression(exp.getStaticType(), exp.getRight(), exp.getLeft(),
+					ComparisonGe.INSTANCE, exp.getCodeLocation());
+			return toApronComparison(state, newExpr);
+		} else if (op == ComparisonLt.INSTANCE) {
+			BinaryExpression newExpr = new BinaryExpression(exp.getStaticType(), exp.getRight(), exp.getLeft(),
+					ComparisonGt.INSTANCE, exp.getCodeLocation());
+			return toApronComparison(state, newExpr);
+		}
+
+		// >, >= and == logic
+		SymbolicExpression combinedExpr;
+		int apronOp;
+
+		if (op == ComparisonEq.INSTANCE) {
+			// x == y -> x - y == 0
+			combinedExpr = new BinaryExpression(
+					exp.getStaticType(),
+					exp.getLeft(),
+					exp.getRight(),
+					NumericNonOverflowingSub.INSTANCE,
+					exp.getCodeLocation());
+			apronOp = Tcons1.EQ;
+		} else if (op == ComparisonGe.INSTANCE) {
+			// x >= y -> x - y >= 0
+			combinedExpr = new BinaryExpression(
+					exp.getStaticType(), exp.getLeft(),
+					exp.getRight(),
+					NumericNonOverflowingSub.INSTANCE,
+					exp.getCodeLocation());
+			apronOp = Tcons1.SUPEQ;
+		} else if (op == ComparisonGt.INSTANCE) {
+			// Apron handle numbers as reals
+			// e.g.: x < 5 == x <= 5
+			combinedExpr = new BinaryExpression(
+					exp.getStaticType(),
+					exp.getLeft(),
+					exp.getRight(),
+					NumericNonOverflowingSub.INSTANCE,
+					exp.getCodeLocation());
+			apronOp = Tcons1.SUP;
+
+		} else {
+			// A != B handled in assume as A < B OR A > B
+			throw new UnsupportedOperationException("Comparison operator " + op + " not supported");
+		}
+
+		Texpr1Node apronExpression = toApronExpression(combinedExpr);
+		if (apronExpression != null) {
+			return new Tcons1(state.state.getEnvironment(), apronOp, apronExpression);
+		} else {
+			throw new UnsupportedOperationException("Impossible to translate the expression: " + combinedExpr);
+		}
 	}
 
 	@Override
@@ -610,15 +684,26 @@ public class Apron
 				BinaryExpression bin = (BinaryExpression) expression;
 				BinaryExpression neg;
 				BinaryOperator op = bin.getOperator();
-				// FIXME: it seems there's a bug with manager.wasExact
-				if (op == ComparisonEq.INSTANCE) {
+
+				if (op == ComparisonNe.INSTANCE) {
+					// A != B -> (A < B) OR (A > B)
+					BinaryExpression lt = new BinaryExpression(bin.getStaticType(), bin.getLeft(), bin.getRight(),
+							ComparisonLt.INSTANCE, bin.getCodeLocation());
+					BinaryExpression gt = new BinaryExpression(bin.getStaticType(), bin.getLeft(), bin.getRight(),
+							ComparisonGt.INSTANCE, bin.getCodeLocation());
+					BinaryExpression or = new BinaryExpression(bin.getStaticType(), lt, gt, LogicalOr.INSTANCE,
+							bin.getCodeLocation());
+
+					return satisfies(state, or, pp, oracle);
+
+				} else if (op == ComparisonEq.INSTANCE) {
 					if (state.state.satisfy(manager, toApronComparison(state, bin)))
 						return Satisfiability.SATISFIED;
 					else {
 						neg = new BinaryExpression(bin.getStaticType(), bin.getLeft(), bin.getRight(),
 								ComparisonNe.INSTANCE, bin.getCodeLocation());
 
-						if (state.state.satisfy(manager, toApronComparison(state, neg)))
+						if (satisfies(state, neg, pp, oracle) == Satisfiability.SATISFIED)
 							return Satisfiability.NOT_SATISFIED;
 
 						return Satisfiability.UNKNOWN;
@@ -671,19 +756,6 @@ public class Apron
 
 						return Satisfiability.UNKNOWN;
 					}
-				} else if (op == ComparisonNe.INSTANCE) {
-					if (state.state.satisfy(manager, toApronComparison(state, bin)))
-						return Satisfiability.SATISFIED;
-					else {
-						neg = new BinaryExpression(bin.getStaticType(), bin.getLeft(), bin.getRight(),
-								ComparisonEq.INSTANCE, bin.getCodeLocation());
-
-						if (state.state.satisfy(manager, toApronComparison(state, neg)))
-							return Satisfiability.NOT_SATISFIED;
-
-						return Satisfiability.UNKNOWN;
-					}
-
 				} else if (op == LogicalAnd.INSTANCE)
 					return satisfies(state, (ValueExpression) bin.getLeft(), pp, oracle)
 							.and(satisfies(state, (ValueExpression) bin.getRight(), pp, oracle));
