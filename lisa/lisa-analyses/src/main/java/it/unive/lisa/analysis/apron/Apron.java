@@ -630,14 +630,26 @@ public class Apron
 			apronOp = Tcons1.SUPEQ;
 		} else if (op == ComparisonGt.INSTANCE) {
 			// Apron handle numbers as reals
-			// e.g.: x < 5 == x <= 5
+			// x > y -> x >= y + 1 -> x - y - 1 >= 0
+            Constant one = new Constant(
+                    Untyped.INSTANCE,
+                    1,
+                    exp.getCodeLocation());
+
+            SymbolicExpression subExpr = new BinaryExpression(
+                    exp.getStaticType(),
+                    exp.getLeft(),
+                    exp.getRight(),
+                    NumericNonOverflowingSub.INSTANCE,
+                    exp.getCodeLocation());
+
 			combinedExpr = new BinaryExpression(
 					exp.getStaticType(),
-					exp.getLeft(),
-					exp.getRight(),
+					subExpr,
+					one,
 					NumericNonOverflowingSub.INSTANCE,
 					exp.getCodeLocation());
-			apronOp = Tcons1.SUP;
+			apronOp = Tcons1.SUPEQ;
 
 		} else {
 			// A != B handled in assume as A < B OR A > B
