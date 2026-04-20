@@ -228,6 +228,58 @@ public class Apron
 					newState = newState.changeEnvironmentCopy(manager, env, false);
 				}
 
+            // Division handle
+            if (expression instanceof BinaryExpression) {
+                BinaryExpression bin = (BinaryExpression) expression;
+                if (bin.getOperator() == NumericNonOverflowingDiv.INSTANCE) {
+                    Texpr1Node denNode = toApronExpression(bin.getRight());
+                    if (denNode != null) {
+                        apron.Interval denBound = newState.getBound(manager,
+                                new Texpr1Intern(newState.getEnvironment(), denNode));
+
+                        int inf = denBound.inf.sgn();
+                        int sup = denBound.sup.sgn();
+
+                        if (inf <= 0 && sup >= 0) {
+
+                            // A/B -> B=[0, 0]
+                            if (inf == 0 && sup == 0) {
+                                // DEBUG
+                                System.out.println("[DEBUG APRON] Div byzero. Bottom returned");
+                                return new Apron(new Abstract1(manager, newState.getEnvironment(), true));
+                            }
+
+                            // A/B -> B=[-1,1] | B=[0,1] | B=[-1,0]
+                            Constant zeroExp = new Constant(Untyped.INSTANCE, 0, bin.getCodeLocation());
+                            BinaryExpression ltZero = new BinaryExpression(bin.getRight().getStaticType(), bin.getRight(), zeroExp, ComparisonLt.INSTANCE, bin.getCodeLocation());
+                            BinaryExpression gtZero = new BinaryExpression(bin.getRight().getStaticType(), bin.getRight(), zeroExp, ComparisonGt.INSTANCE, bin.getCodeLocation());
+
+                            Apron safeState = new Apron(newState);
+                            Apron resultLt = new Apron(new Abstract1(manager, newState.getEnvironment(), true));
+                            Apron resultGt = new Apron(new Abstract1(manager, newState.getEnvironment(), true));
+
+                            if (inf < 0) {
+                                Apron assumedLt = assume(safeState, ltZero, pp, pp, oracle);
+                                if (!assumedLt.isBottom()) {
+                                    resultLt = new Apron(assumedLt.state.assignCopy(manager, variable, new Texpr1Intern(assumedLt.state.getEnvironment(), apronExpression), null));
+                                }
+                            }
+
+                            if (sup > 0) {
+                                Apron assumedGt = assume(safeState, gtZero, pp, pp, oracle);
+                                if (!assumedGt.isBottom()) {
+                                    resultGt = new Apron(assumedGt.state.assignCopy(manager, variable, new Texpr1Intern(assumedGt.state.getEnvironment(), apronExpression), null));
+                                }
+                            }
+                            System.out.println("[DEBUG APRON] Interval split div (" + inf + " , " + sup + ")");
+                            Apron result = resultLt.lub(resultGt);
+                            System.out.println("[DEBUG APRON] LUB between " + resultLt.state.toString() + " and " + resultGt.state.toString() + ": " + result.state.toString());
+                            return result;
+                        }
+                    }
+                }
+            }
+
 			// DEBUG
 			if (expression.toString().contains("/")) {
 				System.out.println("[DEBUG APRON] Assigning to Apron: variable: " + variable);
@@ -976,6 +1028,12 @@ public class Apron
 
 	@Override
 	public StructuredRepresentation representation() {
+        if (isTop()) {
+            return new StringRepresentation("#TOP#");
+        }
+        if (isBottom()) {
+            return new StringRepresentation("_|_");
+        }
 		return new StringRepresentation(state.toString());
 	}
 
