@@ -41,7 +41,9 @@ class tutorial {
 
     widening_1() {
         def i = 0;
-        // Expected without narrowing: i >= +inf
+        // Expected:
+        // without narrowing: i >= +inf
+        // with narrowing: i = 1000000
         while (i < 1000000) {
             i = i + 1;
         }
@@ -50,9 +52,10 @@ class tutorial {
 
     widening_2() {
         def i = 0;
-        // Threshold test depending on unroll limit:
-        // Expected: i = 4 (if unrolled) or i >= +inf (if widened early)
-        while (i < 4) {
+        // Expected:
+        // with narrowing: i = 10
+        // without narrowing: i >= 10
+        while (i < 10) {
             i = i + 1;
         }
         return i;
@@ -60,7 +63,9 @@ class tutorial {
 
     widening_3() {
         def j = 100;
-        // Expected without narrowing: j <= -inf
+        // Expected:
+        // without narrowing: j <= -inf
+        // with narrowing: j = [-1000006,-1000000]
         while (j > -1000000) {
             j = j - 7;
         }
@@ -115,8 +120,7 @@ class tutorial {
     }
 
     lub_2() {
-        // Branching with dead code - endless loop
-        // Expected: Bottom (Unreachable return)
+        // Expected: Bottom
         def a = 0;
         def limit = 351;
         while (a < limit) {
@@ -132,6 +136,14 @@ class tutorial {
     // Dead Code and Narrowing
 
     dead_code_1() {
+        def b = 10;
+        while (b > 5) {
+            b = b + 1;
+        }
+        return b;
+    }
+
+    dead_code_2() {
         def x = 0;
         while (x < 100) {
             x = x + 1;
@@ -194,6 +206,34 @@ class tutorial {
         return c;
     }
 
+    div_by_zero_4(flag) {
+        def a = 2;
+        def b = 0;
+
+        if (flag) {
+            b = -23;
+        } else {
+            b = 5;
+        }
+
+        def c = a / b;
+        return c;
+    }
+
+    div_by_zero_5(flag) {
+        def a = 2;
+        def b = 0;
+
+        if (flag) {
+            b = -5;
+        } else {
+            b = 0;
+        }
+
+        def c = a / b;
+        return c;
+    }
+
     arithmetic_multiplication() {
         def x = 5;
         def y = 10;
@@ -207,9 +247,10 @@ class tutorial {
         while (x < 5) {
             x = x + 1;
         }
-        // x is [0, 5] (with narrowing) or [0, +inf]
+        // with narrowing: x = 5
+        // without narrowing: x = [5, +inf]
         def y = 0 - 2;
-        def z = x * y; // Expected with narrowing: [-10, 0] or [-inf, -10]
+        def z = x * y; // Expected with narrowing: z = -10
         return z;
     }
 
@@ -249,8 +290,6 @@ class tutorial {
         while (x < 100) {
             x = x + 1;
         }
-        // At this point x has accumulated uncertainty from widening
-        // The following assignment should reset the abstraction
         x = 5;
         // Expected: x = 5
         return x;
