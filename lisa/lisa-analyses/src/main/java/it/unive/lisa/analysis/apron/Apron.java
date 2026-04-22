@@ -859,7 +859,8 @@ public class Apron
 		}
 	}
 
-	public Apron meet(
+	@Override
+	public Apron glb(
 			Apron other)
 			throws SemanticException {
 		try {
@@ -880,13 +881,37 @@ public class Apron
 			Apron other)
 			throws SemanticException {
 		try {
-			if (other.state.isBottom(manager))
-				return new Apron(state);
-			if (this.state.isBottom(manager))
-				return other;
-			return new Apron(state.widening(manager, other.state));
+			Environment lubEnv = state.getEnvironment().lce(other.state.getEnvironment());
+			Abstract1 unifiedThis = state.changeEnvironmentCopy(manager, lubEnv, state.isBottom(manager));
+			Abstract1 unifiedOther = other.state.changeEnvironmentCopy(manager, lubEnv, other.state.isBottom(manager));
+
+			if (unifiedOther.isBottom(manager))
+				return new Apron(unifiedThis);
+			if (unifiedThis.isBottom(manager))
+				return new Apron(unifiedOther);
+
+			return new Apron(unifiedThis.widening(manager, unifiedOther));
 		} catch (ApronException e) {
 			throw new UnsupportedOperationException("Apron library crashed", e);
+		}
+	}
+
+	@Override
+	public Apron narrowing(
+			Apron other)
+			throws SemanticException {
+		// Narrowing is the meet with next iteration's state
+		try {
+			if (this.isBottom()) {
+				return this;
+			}
+			if (other.isBottom()) {
+				return this;
+			}
+			return this.glb(other);
+
+		} catch (Exception e) {
+			throw new SemanticException("Apron error during narrowing() method:", e);
 		}
 	}
 
