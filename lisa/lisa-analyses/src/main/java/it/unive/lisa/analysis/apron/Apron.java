@@ -228,58 +228,6 @@ public class Apron
 					newState = newState.changeEnvironmentCopy(manager, env, false);
 				}
 
-            // Division handle
-            if (expression instanceof BinaryExpression) {
-                BinaryExpression bin = (BinaryExpression) expression;
-                if (bin.getOperator() == NumericNonOverflowingDiv.INSTANCE) {
-                    Texpr1Node denNode = toApronExpression(bin.getRight());
-                    if (denNode != null) {
-                        apron.Interval denBound = newState.getBound(manager,
-                                new Texpr1Intern(newState.getEnvironment(), denNode));
-
-                        int inf = denBound.inf.sgn();
-                        int sup = denBound.sup.sgn();
-
-                        if (inf <= 0 && sup >= 0) {
-
-                            // A/B -> B=[0, 0]
-                            if (inf == 0 && sup == 0) {
-                                // DEBUG
-                                System.out.println("[DEBUG APRON] Div byzero. Bottom returned");
-                                return new Apron(new Abstract1(manager, newState.getEnvironment(), true));
-                            }
-
-                            // A/B -> B=[-1,1] | B=[0,1] | B=[-1,0]
-                            Constant zeroExp = new Constant(Untyped.INSTANCE, 0, bin.getCodeLocation());
-                            BinaryExpression ltZero = new BinaryExpression(bin.getRight().getStaticType(), bin.getRight(), zeroExp, ComparisonLt.INSTANCE, bin.getCodeLocation());
-                            BinaryExpression gtZero = new BinaryExpression(bin.getRight().getStaticType(), bin.getRight(), zeroExp, ComparisonGt.INSTANCE, bin.getCodeLocation());
-
-                            Apron safeState = new Apron(newState);
-                            Apron resultLt = new Apron(new Abstract1(manager, newState.getEnvironment(), true));
-                            Apron resultGt = new Apron(new Abstract1(manager, newState.getEnvironment(), true));
-
-                            if (inf < 0) {
-                                Apron assumedLt = assume(safeState, ltZero, pp, pp, oracle);
-                                if (!assumedLt.isBottom()) {
-                                    resultLt = new Apron(assumedLt.state.assignCopy(manager, variable, new Texpr1Intern(assumedLt.state.getEnvironment(), apronExpression), null));
-                                }
-                            }
-
-                            if (sup > 0) {
-                                Apron assumedGt = assume(safeState, gtZero, pp, pp, oracle);
-                                if (!assumedGt.isBottom()) {
-                                    resultGt = new Apron(assumedGt.state.assignCopy(manager, variable, new Texpr1Intern(assumedGt.state.getEnvironment(), apronExpression), null));
-                                }
-                            }
-                            System.out.println("[DEBUG APRON] Interval split div (" + inf + " , " + sup + ")");
-                            Apron result = resultLt.lub(resultGt);
-                            System.out.println("[DEBUG APRON] LUB between " + resultLt.state.toString() + " and " + resultGt.state.toString() + ": " + result.state.toString());
-                            return result;
-                        }
-                    }
-                }
-            }
-
 			// DEBUG
 			if (expression.toString().contains("/")) {
 				System.out.println("[DEBUG APRON] Assigning to Apron: variable: " + variable);
@@ -496,7 +444,51 @@ public class Apron
 			BinaryExpression bin = (BinaryExpression) expression;
 			Apron left = smallStepSemantics(state, (ValueExpression) bin.getLeft(), pp, oracle);
 			Apron right = smallStepSemantics(state, (ValueExpression) bin.getRight(), pp, oracle);
-			return left.lub(right);
+			Apron result = left.lub(right);
+
+			if (bin.getOperator() == NumericNonOverflowingDiv.INSTANCE) {
+				try {
+					Texpr1Node denNode = toApronExpression(bin.getRight());
+					if (denNode != null) {
+						apron.Interval denBound = result.state.getBound(manager,
+								new Texpr1Intern(result.state.getEnvironment(), denNode));
+						int inf = denBound.inf.sgn();
+						int sup = denBound.sup.sgn();
+
+						if (inf <= 0 && sup >= 0) {
+
+							if (inf == 0 && sup == 0) {
+								System.out.println("[DEBUG APRON] Div by zero in smallStepSemantics. Bottom returned");
+								return new Apron(new Abstract1(manager, result.state.getEnvironment(), true));
+							}
+							Constant zeroExp = new Constant(Untyped.INSTANCE, 0, bin.getCodeLocation());
+							BinaryExpression ltZero = new BinaryExpression(bin.getRight().getStaticType(),
+									bin.getRight(), zeroExp, ComparisonLt.INSTANCE, bin.getCodeLocation());
+							BinaryExpression gtZero = new BinaryExpression(bin.getRight().getStaticType(),
+									bin.getRight(), zeroExp, ComparisonGt.INSTANCE, bin.getCodeLocation());
+
+							Apron assumedLt = new Apron(new Abstract1(manager, result.state.getEnvironment(), true));
+							Apron assumedGt = new Apron(new Abstract1(manager, result.state.getEnvironment(), true));
+
+							if (inf < 0) {
+								assumedLt = assume(result, ltZero, pp, pp, oracle);
+							}
+
+							if (sup > 0) {
+								assumedGt = assume(result, gtZero, pp, pp, oracle);
+							}
+
+							System.out.println("[DEBUG APRON] Interval split div (" + inf + " , " + sup + ")");
+
+							result = assumedLt.lub(assumedGt);
+						}
+					}
+				} catch (ApronException e) {
+					throw new UnsupportedOperationException("Apron library crashed during division check", e);
+				}
+			}
+
+			return result;
 		}
 
 		return new Apron(state.state);
@@ -520,11 +512,13 @@ public class Apron
 			UnaryExpression un = (UnaryExpression) expression;
 			Operator op = un.getOperator();
 
+			// Double neg
 			if (op == LogicalNegation.INSTANCE) {
 				ValueExpression inner = (ValueExpression) un.getExpression();
 				if (inner instanceof UnaryExpression
 						&& ((UnaryExpression) inner).getOperator() == LogicalNegation.INSTANCE) {
 					// Passed src and dest instead pp
+
 					return assume(state,
 							((ValueExpression) ((UnaryExpression) inner).getExpression()).removeNegations(), src, dest,
 							oracle);
@@ -683,17 +677,17 @@ public class Apron
 		} else if (op == ComparisonGt.INSTANCE) {
 			// Apron handle numbers as reals
 			// x > y -> x >= y + 1 -> x - y - 1 >= 0
-            Constant one = new Constant(
-                    Untyped.INSTANCE,
-                    1,
-                    exp.getCodeLocation());
+			Constant one = new Constant(
+					Untyped.INSTANCE,
+					1,
+					exp.getCodeLocation());
 
-            SymbolicExpression subExpr = new BinaryExpression(
-                    exp.getStaticType(),
-                    exp.getLeft(),
-                    exp.getRight(),
-                    NumericNonOverflowingSub.INSTANCE,
-                    exp.getCodeLocation());
+			SymbolicExpression subExpr = new BinaryExpression(
+					exp.getStaticType(),
+					exp.getLeft(),
+					exp.getRight(),
+					NumericNonOverflowingSub.INSTANCE,
+					exp.getCodeLocation());
 
 			combinedExpr = new BinaryExpression(
 					exp.getStaticType(),
@@ -1028,12 +1022,12 @@ public class Apron
 
 	@Override
 	public StructuredRepresentation representation() {
-        if (isTop()) {
-            return new StringRepresentation("#TOP#");
-        }
-        if (isBottom()) {
-            return new StringRepresentation("_|_");
-        }
+		if (isTop()) {
+			return new StringRepresentation("#TOP#");
+		}
+		if (isBottom()) {
+			return new StringRepresentation("_|_");
+		}
 		return new StringRepresentation(state.toString());
 	}
 
