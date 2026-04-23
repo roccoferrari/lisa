@@ -31,6 +31,34 @@ class tutorial {
         return c;
     }
 
+    div_by_zero_4(flag) {
+        def a = 2;
+        def b = 0;
+
+        if (flag) {
+            b = -23;
+        } else {
+            b = 5;
+        }
+
+        def c = a / b;
+        return c;
+    }
+
+    div_by_zero_5(flag) {
+        def a = 2;
+        def b = 0;
+
+        if (flag) {
+            b = -5;
+        } else {
+            b = 0;
+        }
+
+        def c = a / b;
+        return c;
+    }
+
     // Relational tracking
 
     relation_1() {
@@ -138,13 +166,14 @@ class tutorial {
         if (x <= y) {
             if (y <= z) {
                 if (x > z) {
-                    // Expected: Unreachable code (Bottom)
+                    // Unreachable code
                     result = -1;
                 } else {
                     result = 1;
                 }
             }
         }
+        // Expected: result = [0,1]
         return result;
     }
 
