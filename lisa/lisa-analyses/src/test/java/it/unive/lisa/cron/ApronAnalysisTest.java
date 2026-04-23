@@ -4,6 +4,7 @@ import it.unive.lisa.DefaultConfiguration;
 import it.unive.lisa.analysis.apron.Apron;
 import it.unive.lisa.outputs.HtmlResults;
 import it.unive.lisa.outputs.JSONResults;
+import it.unive.lisa.program.cfg.fixpoints.forward.ForwardDescendingNarrowingFixpoint;
 import org.junit.jupiter.api.Test;
 
 public class ApronAnalysisTest
@@ -19,8 +20,9 @@ public class ApronAnalysisTest
 
 		CronConfiguration conf = new CronConfiguration();
 		conf.outputs.add(new JSONResults<>());
-		// conf.outputs.add(new HtmlResults<>(true));
+		conf.outputs.add(new HtmlResults<>(true));
 		// conf.forceUpdate = true;
+		conf.forwardDescendingFixpoint = new ForwardDescendingNarrowingFixpoint<>();
 		conf.analysis = DefaultConfiguration.simpleDomain(
 				DefaultConfiguration.defaultHeapDomain(),
 				new Apron(),
@@ -40,6 +42,7 @@ public class ApronAnalysisTest
 		conf.outputs.add(new JSONResults<>());
 		conf.outputs.add(new HtmlResults<>(true));
 		// conf.forceUpdate = true;
+        conf.forwardDescendingFixpoint = new ForwardDescendingNarrowingFixpoint<>();
 		conf.analysis = DefaultConfiguration.simpleDomain(
 				DefaultConfiguration.defaultHeapDomain(),
 				new Apron(),
@@ -52,12 +55,12 @@ public class ApronAnalysisTest
 	@Test
 	public void testApronPoly() {
 		Apron.loadLibrary();
-
 		Apron.setManager(Apron.ApronDomain.Polka);
 		CronConfiguration conf = new CronConfiguration();
 		conf.outputs.add(new JSONResults<>());
 		conf.outputs.add(new HtmlResults<>(true));
 		// conf.forceUpdate = true;
+        conf.forwardDescendingFixpoint = new ForwardDescendingNarrowingFixpoint<>();
 		conf.analysis = DefaultConfiguration.simpleDomain(
 				DefaultConfiguration.defaultHeapDomain(),
 				new Apron(),
