@@ -139,7 +139,7 @@ class tutorial {
         def result = 0;
 
         if (z != 3 * x) {
-            // Expected: Bottom
+            // Expected: Dead branch
             result = -999;
         } else {
             result = 42;
@@ -152,7 +152,7 @@ class tutorial {
         if (a <= b + c) {
             if (b + c <= d) {
                 if (a > d) {
-                    // Expected: Bottom
+                    // Expected: Dead branch
                     result = -1;
                 } else {
                     result = 1;
@@ -160,6 +160,65 @@ class tutorial {
             }
         }
         return result;
+    }
+
+    // Div by zero
+
+    div_by_zero_1() {
+        def x = 10;
+        def y = 0;
+        def z = 15;
+        def a = x + z / y;
+        return a;
+    }
+
+    div_by_zero_2() {
+        def x = 10;
+        def y = 0;
+        def z = 15;
+        def a = (x + z) /  y;
+        return a;
+    }
+
+    div_by_zero_3(flag) {
+        def a = 2;
+        def b = 0;
+
+        if (flag)
+            b = 0;
+        else
+            b = 2;
+
+        def c = a / b;
+        return c;
+    }
+
+    div_by_zero_4(flag) {
+        def a = 2;
+        def b = 0;
+
+        if (flag) {
+            b = -23;
+        } else {
+            b = 5;
+        }
+
+        def c = a / b;
+        return c;
+    }
+
+    div_by_zero_5(flag) {
+        def a = 2;
+        def b = 0;
+
+        if (flag) {
+            b = -5;
+        } else {
+            b = 0;
+        }
+
+        def c = a / b;
+        return c;
     }
 
 }
