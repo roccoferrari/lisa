@@ -59,6 +59,61 @@ class tutorial {
         return c;
     }
 
+    mod_by_zero_1() {
+        def x = 10;
+        def y = 0;
+        // Expected: Bottom
+        def z = x % y;
+        return z;
+    }
+
+    mod_by_zero_2() {
+        def a = 2 % 0;
+        return a;
+    }
+
+    mod_by_zero_3(flag) {
+        def a = 2;
+        def b = 0;
+
+        if (flag) {
+            b = 0;
+        } else {
+            b = 2;
+        }
+
+        def c = a % b;
+        return c;
+    }
+
+    mod_by_zero_4(flag) {
+        def a = 2;
+        def b = 0;
+
+        if (flag) {
+            b = -23;
+        } else {
+            b = 5;
+        }
+
+        def c = a % b;
+        return c;
+    }
+
+    mod_by_zero_5(flag) {
+        def a = 2;
+        def b = 0;
+
+        if (flag) {
+            b = -5;
+        } else {
+            b = 0;
+        }
+
+        def c = a % b;
+        return c;
+    }
+
     // Relational tracking
 
     relation_1() {
