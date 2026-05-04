@@ -6,8 +6,11 @@ import it.unive.lisa.program.cfg.CodeLocation;
 import it.unive.lisa.program.cfg.ProgramPoint;
 import it.unive.lisa.symbolic.ExpressionVisitor;
 import it.unive.lisa.symbolic.SymbolicExpression;
+import it.unive.lisa.symbolic.value.operator.NegatableOperator;
 import it.unive.lisa.symbolic.value.operator.TypeOperator;
 import it.unive.lisa.symbolic.value.operator.binary.BinaryOperator;
+import it.unive.lisa.symbolic.value.operator.binary.LogicalAnd;
+import it.unive.lisa.symbolic.value.operator.binary.LogicalOr;
 import it.unive.lisa.symbolic.value.operator.binary.TypeCheck;
 import it.unive.lisa.type.Type;
 
@@ -206,5 +209,32 @@ public class BinaryExpression
 			return this;
 		return new BinaryExpression(getStaticType(), l, r, operator, getCodeLocation());
 	}
+
+    @Override
+    public ValueExpression invertCondition() {
+        BinaryOperator oppositeOp = operator instanceof NegatableOperator
+                ? (BinaryOperator) ((NegatableOperator) operator).opposite()
+                : operator;
+
+        if (operator instanceof LogicalAnd || operator instanceof LogicalOr) {
+            ValueExpression invertedLeft = ((ValueExpression) getLeft()).invertCondition();
+            ValueExpression invertedRight = ((ValueExpression) getRight()).invertCondition();
+            return new BinaryExpression(
+                    getStaticType(),
+                    invertedLeft,
+                    invertedRight,
+                    oppositeOp,
+                    getCodeLocation()
+            );
+        } else {
+            return new BinaryExpression(
+                    getStaticType(),
+                    getLeft(),
+                    getRight(),
+                    oppositeOp,
+                    getCodeLocation()
+            );
+        }
+    }
 
 }
