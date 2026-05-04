@@ -229,7 +229,7 @@ public class Apron
 				}
 
 			// DEBUG
-			if (expression.toString().contains("/")) {
+			if (expression.toString().contains("%")) {
 				System.out.println("[DEBUG APRON] Assigning to Apron: variable: " + variable);
 				System.out.println("[DEBUG APRON] Expression translated to C: " + apronExpression.toString());
 			}
@@ -238,7 +238,7 @@ public class Apron
 					new Texpr1Intern(newState.getEnvironment(), apronExpression), null));
 
 			// DEBUG
-			if (expression.toString().contains("/")) {
+			if (expression.toString().contains("%")) {
 				System.out.println("[DEBUG APRON] Assign result: " + result.state.toString());
 
 				try {
@@ -353,7 +353,7 @@ public class Apron
 					return null;
 
 				// DEBUG
-				if (bin.getOperator() == NumericNonOverflowingDiv.INSTANCE) {
+				if (bin.getOperator() == NumericNonOverflowingMod.INSTANCE) {
 					System.out.println("\n[DEBUG APRON] left: " + bin.getLeft() + " (Class: "
 							+ bin.getLeft().getClass().getSimpleName() + ")");
 					System.out.println("[DEBUG APRON] right: " + bin.getRight() + " (Class: "
@@ -376,6 +376,7 @@ public class Apron
 				|| op == NumericNonOverflowingDiv.INSTANCE
 				|| op == NumericNonOverflowingSub.INSTANCE
 				|| op == NumericNonOverflowingMod.INSTANCE
+				|| op == NumericNonOverflowingRem.INSTANCE
 				|| op == ComparisonEq.INSTANCE
 				|| op == ComparisonNe.INSTANCE
 				|| op == ComparisonGe.INSTANCE
@@ -392,7 +393,7 @@ public class Apron
 			return Texpr1BinNode.OP_SUB;
 		else if (op == NumericNonOverflowingDiv.INSTANCE)
 			return Texpr1BinNode.OP_DIV;
-		else if (op == NumericNonOverflowingMod.INSTANCE)
+		else if (op == NumericNonOverflowingMod.INSTANCE || op == NumericNonOverflowingRem.INSTANCE)
 			return Texpr1BinNode.OP_MOD;
 		else if (op == ComparisonEq.INSTANCE)
 			return Tcons1.EQ;
@@ -446,8 +447,14 @@ public class Apron
 			Apron right = smallStepSemantics(state, (ValueExpression) bin.getRight(), pp, oracle);
 			Apron result = left.lub(right);
 
+			// DEBUG
+			System.out.println("[DEBUG MOD] Op: " + bin.getOperator().getClass().getSimpleName());
+			System.out.println("[DEBUG MOD] Right: " + bin.getRight().getClass().getSimpleName() + " -> "
+					+ bin.getRight().toString());
+
 			if (bin.getOperator() == NumericNonOverflowingDiv.INSTANCE
-					|| bin.getOperator() == NumericNonOverflowingMod.INSTANCE) {
+					|| bin.getOperator() == NumericNonOverflowingMod.INSTANCE
+					|| bin.getOperator() == NumericNonOverflowingRem.INSTANCE) {
 				try {
 					Texpr1Node denNode = toApronExpression(bin.getRight());
 					if (denNode != null) {
@@ -459,7 +466,7 @@ public class Apron
 						if (inf <= 0 && sup >= 0) {
 
 							if (inf == 0 && sup == 0) {
-								System.out.println("[DEBUG APRON] Div by zero in smallStepSemantics. Bottom returned");
+								System.out.println("[DEBUG APRON] mod by zero in smallStepSemantics. Bottom returned");
 								return new Apron(new Abstract1(manager, result.state.getEnvironment(), true));
 							}
 							Constant zeroExp = new Constant(Untyped.INSTANCE, 0, bin.getCodeLocation());
