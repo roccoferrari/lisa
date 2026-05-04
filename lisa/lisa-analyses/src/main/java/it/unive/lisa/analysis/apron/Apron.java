@@ -177,7 +177,7 @@ public class Apron
 
 		try {
 			String[] vars = { "<ret>" }; // Variable needed to represent the
-											// returned value
+			// returned value
 			state = new Abstract1(manager, new apron.Environment(new String[0], vars));
 		} catch (ApronException e) {
 			throw new UnsupportedOperationException("Apron library crashed", e);
@@ -215,9 +215,9 @@ public class Apron
 			// hence, we treat it as "don't know"
 			if (apronExpression == null)
 				return forgetAbstractionOf(newState, id, pp, oracle);// new
-																		// Apron(newState.forgetCopy(manager,
-																		// toApronVar(id),
-																		// false));//
+			// Apron(newState.forgetCopy(manager,
+			// toApronVar(id),
+			// false));//
 
 			Var[] vars = apronExpression.getVars();
 
@@ -446,7 +446,8 @@ public class Apron
 			Apron right = smallStepSemantics(state, (ValueExpression) bin.getRight(), pp, oracle);
 			Apron result = left.lub(right);
 
-			if (bin.getOperator() == NumericNonOverflowingDiv.INSTANCE) {
+			if (bin.getOperator() == NumericNonOverflowingDiv.INSTANCE
+					|| bin.getOperator() == NumericNonOverflowingMod.INSTANCE) {
 				try {
 					Texpr1Node denNode = toApronExpression(bin.getRight());
 					if (denNode != null) {
