@@ -43,4 +43,8 @@ public abstract class ValueExpression
 		return this;
 	}
 
+    public ValueExpression invertCondition() {
+        return this;
+    }
+
 }
