@@ -79,8 +79,10 @@ public class UnaryExpression
 			BinaryOperator oppositeOp = op instanceof NegatableOperator
 					? (BinaryOperator) ((NegatableOperator) op).opposite()
 					: op;
-			ValueExpression oppositeLeft = left.removeNegations();
-			ValueExpression oppositeRight = right.removeNegations();
+
+            ValueExpression oppositeLeft = left.invertCondition().removeNegations();
+            ValueExpression oppositeRight = right.invertCondition().removeNegations();
+
 			if (op == oppositeOp && left == oppositeLeft && right == oppositeRight)
 				// if nothing changed, preserve reference equality
 				return this;
