@@ -18,7 +18,7 @@ import it.unive.lisa.type.Untyped;
 import it.unive.lisa.util.representation.StringRepresentation;
 import it.unive.lisa.util.representation.StructuredRepresentation;
 import java.math.BigInteger;
-import java.util.Arrays;
+import java.util.*;
 import java.util.function.Predicate;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -198,66 +198,62 @@ public class Apron
 			SemanticOracle oracle)
 			throws SemanticException {
 
-		try {
-			Environment env = state.state.getEnvironment();
-			Var variable = toApronVar(id);
-			Abstract1 newState;
-			if (!env.hasVar(variable)) {
-				Var[] vars = { variable };
-				env = env.add(new Var[0], vars);
-				newState = state.state.changeEnvironmentCopy(manager, env, false);
-			} else
-				newState = state.state;
+		Set<Apron> safeStates = getConstraintsForDivision(state, expression, pp, oracle);
 
-			Texpr1Node apronExpression = toApronExpression(expression);
-
-			// we are not able to translate expression
-			// hence, we treat it as "don't know"
-			if (apronExpression == null)
-				return forgetAbstractionOf(newState, id, pp, oracle);// new
-			// Apron(newState.forgetCopy(manager,
-			// toApronVar(id),
-			// false));//
-
-			Var[] vars = apronExpression.getVars();
-
-			for (Var var : vars)
-				if (!newState.getEnvironment().hasVar(var)) {
-					Var[] vars1 = { var };
-					env = newState.getEnvironment().add(new Var[0], vars1);
-					newState = newState.changeEnvironmentCopy(manager, env, false);
-				}
-
-			// DEBUG
-			if (expression.toString().contains("%")) {
-				System.out.println("[DEBUG APRON] Assigning to Apron: variable: " + variable);
-				System.out.println("[DEBUG APRON] Expression translated to C: " + apronExpression.toString());
-			}
-
-			Apron result = new Apron(newState.assignCopy(manager, variable,
-					new Texpr1Intern(newState.getEnvironment(), apronExpression), null));
-
-			// DEBUG
-			if (expression.toString().contains("%")) {
-				System.out.println("[DEBUG APRON] Assign result: " + result.state.toString());
-
-				try {
-					apron.Interval varBound = result.state.getBound(manager, variable.toString());
-
-					System.out.println("[DEBUG APRON] Interval: '" + variable + "' is: " + varBound.toString());
-					System.out.println("[DEBUG APRON] Interval isBottom(): " + varBound.isBottom());
-					System.out.println("[DEBUG APRON] Interval isTop(): " + varBound.isTop());
-				} catch (Exception e) {
-					System.out.println("[DEBUG APRON] Impossible retrieve limits: " + e.getMessage());
-				}
-				System.out.println("\n");
-			}
-
-			return result;
-
-		} catch (ApronException e) {
-			throw new UnsupportedOperationException("Apron library crashed", e);
+		if (safeStates.isEmpty()) {
+			return bottom();
 		}
+
+		Apron finalResult = null;
+
+		for (Apron safeState : safeStates) {
+			try {
+				Environment env = safeState.state.getEnvironment();
+				Var variable = toApronVar(id);
+				Abstract1 newState;
+				if (!env.hasVar(variable)) {
+					Var[] vars = { variable };
+					env = env.add(new Var[0], vars);
+					newState = safeState.state.changeEnvironmentCopy(manager, env, false);
+				} else {
+					newState = safeState.state;
+				}
+
+				Texpr1Node apronExpression = toApronExpression(expression);
+
+				if (apronExpression == null) {
+					Apron forgot = forgetAbstractionOf(newState, id, pp, oracle);
+					if (finalResult == null)
+						finalResult = forgot;
+					else
+						finalResult = finalResult.lub(forgot);
+					continue;
+				}
+
+				Var[] vars = apronExpression.getVars();
+				for (Var var : vars) {
+					if (!newState.getEnvironment().hasVar(var)) {
+						Var[] vars1 = { var };
+						env = newState.getEnvironment().add(new Var[0], vars1);
+						newState = newState.changeEnvironmentCopy(manager, env, false);
+					}
+				}
+
+				Apron assignedState = new Apron(newState.assignCopy(manager, variable,
+						new Texpr1Intern(newState.getEnvironment(), apronExpression), null));
+
+				if (finalResult == null) {
+					finalResult = assignedState;
+				} else {
+					finalResult = finalResult.lub(assignedState);
+				}
+
+			} catch (ApronException e) {
+				throw new UnsupportedOperationException("Apron library crashed", e);
+			}
+		}
+
+		return finalResult != null ? finalResult : bottom();
 	}
 
 	private Apron forgetAbstractionOf(
@@ -352,14 +348,6 @@ public class Apron
 					// we are not able to translate the expression
 					return null;
 
-				// DEBUG
-				if (bin.getOperator() == NumericNonOverflowingMod.INSTANCE) {
-					System.out.println("\n[DEBUG APRON] left: " + bin.getLeft() + " (Class: "
-							+ bin.getLeft().getClass().getSimpleName() + ")");
-					System.out.println("[DEBUG APRON] right: " + bin.getRight() + " (Class: "
-							+ bin.getRight().getClass().getSimpleName() + ")");
-				}
-
 				return new Texpr1BinNode(toApronOperator(bin.getOperator()), rewrittenLeft, rewrittenRight);
 			}
 		}
@@ -445,58 +433,7 @@ public class Apron
 			BinaryExpression bin = (BinaryExpression) expression;
 			Apron left = smallStepSemantics(state, (ValueExpression) bin.getLeft(), pp, oracle);
 			Apron right = smallStepSemantics(state, (ValueExpression) bin.getRight(), pp, oracle);
-			Apron result = left.lub(right);
-
-			// DEBUG
-			System.out.println("[DEBUG MOD] Op: " + bin.getOperator().getClass().getSimpleName());
-			System.out.println("[DEBUG MOD] Right: " + bin.getRight().getClass().getSimpleName() + " -> "
-					+ bin.getRight().toString());
-
-			if (bin.getOperator() == NumericNonOverflowingDiv.INSTANCE
-					|| bin.getOperator() == NumericNonOverflowingMod.INSTANCE
-					|| bin.getOperator() == NumericNonOverflowingRem.INSTANCE) {
-				try {
-					Texpr1Node denNode = toApronExpression(bin.getRight());
-					if (denNode != null) {
-						apron.Interval denBound = result.state.getBound(manager,
-								new Texpr1Intern(result.state.getEnvironment(), denNode));
-						int inf = denBound.inf.sgn();
-						int sup = denBound.sup.sgn();
-
-						if (inf <= 0 && sup >= 0) {
-
-							if (inf == 0 && sup == 0) {
-								System.out.println("[DEBUG APRON] mod by zero in smallStepSemantics. Bottom returned");
-								return new Apron(new Abstract1(manager, result.state.getEnvironment(), true));
-							}
-							Constant zeroExp = new Constant(Untyped.INSTANCE, 0, bin.getCodeLocation());
-							BinaryExpression ltZero = new BinaryExpression(bin.getRight().getStaticType(),
-									bin.getRight(), zeroExp, ComparisonLt.INSTANCE, bin.getCodeLocation());
-							BinaryExpression gtZero = new BinaryExpression(bin.getRight().getStaticType(),
-									bin.getRight(), zeroExp, ComparisonGt.INSTANCE, bin.getCodeLocation());
-
-							Apron assumedLt = new Apron(new Abstract1(manager, result.state.getEnvironment(), true));
-							Apron assumedGt = new Apron(new Abstract1(manager, result.state.getEnvironment(), true));
-
-							if (inf < 0) {
-								assumedLt = assume(result, ltZero, pp, pp, oracle);
-							}
-
-							if (sup > 0) {
-								assumedGt = assume(result, gtZero, pp, pp, oracle);
-							}
-
-							System.out.println("[DEBUG APRON] Interval split div (" + inf + " , " + sup + ")");
-
-							result = assumedLt.lub(assumedGt);
-						}
-					}
-				} catch (ApronException e) {
-					throw new UnsupportedOperationException("Apron library crashed during division check", e);
-				}
-			}
-
-			return result;
+			return left.lub(right);
 		}
 
 		return new Apron(state.state);
@@ -1142,6 +1079,93 @@ public class Apron
 		} catch (Exception e) {
 			throw new SemanticException("Apron error in forgetIdentifiersIf() method", e);
 		}
+	}
+
+	private List<ValueExpression> extractDenominators(
+			ValueExpression expression) {
+		List<ValueExpression> denominators = new ArrayList<>();
+
+		if (expression instanceof UnaryExpression) {
+			denominators.addAll(extractDenominators((ValueExpression) ((UnaryExpression) expression).getExpression()));
+		} else if (expression instanceof BinaryExpression) {
+			BinaryExpression bin = (BinaryExpression) expression;
+			denominators.addAll(extractDenominators((ValueExpression) bin.getLeft()));
+			denominators.addAll(extractDenominators((ValueExpression) bin.getRight()));
+
+			BinaryOperator op = bin.getOperator();
+			if (op == NumericNonOverflowingDiv.INSTANCE
+					|| op == NumericNonOverflowingMod.INSTANCE
+					|| op == NumericNonOverflowingRem.INSTANCE) {
+				denominators.add((ValueExpression) bin.getRight());
+			}
+		}
+		return denominators;
+	}
+
+	private Set<Apron> getConstraintsForDivision(
+			Apron initialState,
+			ValueExpression expression,
+			ProgramPoint pp,
+			SemanticOracle oracle)
+			throws SemanticException {
+
+		Set<Apron> currentStates = new HashSet<>();
+		currentStates.add(initialState);
+
+		List<ValueExpression> denominators = extractDenominators(expression);
+
+		if (denominators.isEmpty()) {
+			return currentStates;
+		}
+
+		Constant zeroExp = new Constant(Untyped.INSTANCE, 0, expression.getCodeLocation());
+
+		for (ValueExpression den : denominators) {
+			Set<Apron> nextStates = new HashSet<>();
+
+			for (Apron state : currentStates) {
+				if (state.isBottom())
+					continue;
+
+				try {
+					Texpr1Node denNode = toApronExpression(den);
+					if (denNode != null) {
+						apron.Interval denBound = state.state.getBound(manager,
+								new Texpr1Intern(state.state.getEnvironment(), denNode));
+
+						int inf = denBound.inf.sgn();
+						int sup = denBound.sup.sgn();
+
+						if (inf <= 0 && sup >= 0) {
+							BinaryExpression ltZero = new BinaryExpression(
+									den.getStaticType(), den, zeroExp, ComparisonLt.INSTANCE, den.getCodeLocation());
+							BinaryExpression gtZero = new BinaryExpression(
+									den.getStaticType(), den, zeroExp, ComparisonGt.INSTANCE, den.getCodeLocation());
+
+							Apron assumedLt = assume(state, ltZero, pp, pp, oracle);
+							Apron assumedGt = assume(state, gtZero, pp, pp, oracle);
+
+							if (!assumedLt.isBottom()) {
+								nextStates.add(assumedLt);
+							}
+							if (!assumedGt.isBottom()) {
+								nextStates.add(assumedGt);
+							}
+						} else {
+							// secure state
+							nextStates.add(state);
+						}
+					} else {
+						// non-translatable expr
+						nextStates.add(state);
+					}
+				} catch (ApronException e) {
+					throw new UnsupportedOperationException("Apron library crashed during division check", e);
+				}
+			}
+			currentStates = nextStates;
+		}
+		return currentStates;
 	}
 
 	@Override
