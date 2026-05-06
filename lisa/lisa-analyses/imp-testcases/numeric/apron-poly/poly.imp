@@ -276,4 +276,22 @@ class tutorial {
         return c;
     }
 
+    div_by_zero_6(flag) {
+            def z = 1;
+            def k = 1;
+            def y = 30;
+
+            if(flag) {
+                z = -20;
+                k = -19;
+            } else {
+                z = 19;
+                k = 20;
+            }
+            def x = 7;
+            def w = 9;
+            x = (y/z) + (x/(z+3)) + w/k;
+            return x;
+        }
+
 }
