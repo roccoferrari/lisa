@@ -23,6 +23,23 @@ import java.util.function.Predicate;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+/**
+ * An implementation of a numerical abstract domain based on the Apron library.
+ * <p>
+ * This class serves as an adapter between the LiSA framework and the native
+ * Apron C library. It provides support for various relational and
+ * non-relational numerical domains (e.g., Box, Octagon, Polyhedra) to track,
+ * evaluate, and constrain numeric variables during abstract interpretation.
+ * </p>
+ * <p>
+ * It implements all standard lattice operations (Least Upper Bound, Greatest
+ * Lower Bound, widening, narrowing), arithmetic and semantic operations
+ * (assignment, assumption, satisfiability).
+ * </p>
+ * 
+ * @see it.unive.lisa.analysis.value.ValueDomain
+ * @see it.unive.lisa.analysis.value.ValueLattice
+ */
 public class Apron
 		implements
 		ValueDomain<Apron>,
@@ -30,12 +47,30 @@ public class Apron
 
 	private static final Logger logger = LogManager.getLogger(Apron.class);
 
+	/**
+	 * The internal manager used by the Apron library to coordinate operations
+	 * within the chosen numerical domain . It must be initialized before
+	 * performing any abstract interpretation.
+	 */
 	private static Manager manager;
 
+	/**
+	 * The internal representation of the abstract state as defined by the
+	 * native Apron library.
+	 */
 	final Abstract1 state;
 
+	/**
+	 * A flag indicating whether the native Apron C library was successfully
+	 * loaded.
+	 */
 	private static boolean IS_AVAILABLE = false;
 
+	/**
+	 * Attempts to load the native Apron library and its dependency from the
+	 * system's default library path. Sets the {@code IS_AVAILABLE} flag to true
+	 * if successful, or logs a warning if the UnsatisfiedLinkError is thrown.
+	 */
 	public static void loadLibrary() {
 		boolean loaded = false;
 		try {
@@ -49,6 +84,14 @@ public class Apron
 		IS_AVAILABLE = loaded;
 	}
 
+	/**
+	 * Attempts to load the native Apron library and its dependency from a
+	 * specific folder path. Sets the {@code IS_AVAILABLE} flag to true if
+	 * successful, or logs a warning if the library is not found.
+	 *
+	 * @param folderPath the absolute path to the directory containing the
+	 *                       shared libraries.
+	 */
 	public static void loadLibrary(
 			String folderPath) {
 		boolean loaded = false;
@@ -63,7 +106,13 @@ public class Apron
 		IS_AVAILABLE = loaded;
 	}
 
-	// Allow to LiSA to verify if Apron is supported
+	/**
+	 * Allows the LiSA framework to verify if the native Apron library is
+	 * supported and currently loaded in the system.
+	 *
+	 * @return {@code true} if the library is available, {@code false}
+	 *             otherwise.
+	 */
 	public static Boolean isAvailable() {
 		return IS_AVAILABLE;
 	}
@@ -92,6 +141,10 @@ public class Apron
 	 * END TODO METHODS SECTION
 	 */
 
+	/**
+	 * Represents the supported numerical abstract domains available in the
+	 * Apron library.
+	 */
 	public enum ApronDomain {
 		/**
 		 * Intervals
@@ -134,6 +187,15 @@ public class Apron
 		PplPoly
 	}
 
+	/**
+	 * Initializes the static Apron manager with the specified numerical domain.
+	 * * @param numericalDomain the desired abstract numerical domain.
+	 * 
+	 * @throws UnsupportedOperationException if the native library is missing,
+	 *                                           or if a requested domain (like
+	 *                                           PPL) is not compiled in the
+	 *                                           current Apron installation.
+	 */
 	public static void setManager(
 			ApronDomain numericalDomain) {
 		if (!IS_AVAILABLE) {
@@ -154,17 +216,43 @@ public class Apron
 		case PolkaEq:
 			manager = new PolkaEq();
 			break;
-		// ppl needed
 		case PplGrid:
+			try {
+				manager = new PplGrid();
+			} catch (LinkageError | Exception e) {
+				throw new UnsupportedOperationException(
+						"Failed to initialize PplGrid. Ensure the PPL library is installed and Apron was compiled with PPL support.",
+						e);
+			}
+			break;
 		case PplPoly:
-			throw new UnsupportedOperationException(
-					numericalDomain
-							+ " domain require PPL library, which is not included in the current Apron compilation");
+			try {
+				manager = new apron.PplPoly(false);
+			} catch (LinkageError | Exception e) {
+				throw new UnsupportedOperationException(
+						"Failed to initialize PplPoly. Ensure the PPL library is installed and Apron was compiled with PPL support.",
+						e);
+			}
+			break;
 		default:
 			throw new UnsupportedOperationException("Numerical domain " + numericalDomain + " unknown in Apron");
 		}
 	}
 
+	/**
+	 * Constructs a new Apron abstract domain instance representing the Top
+	 * state.
+	 * <p>
+	 * If the manager has not been explicitly set via
+	 * {@link #setManager(ApronDomain)}, the {@link ApronDomain#Box} domain is
+	 * used by default. An initial environment is created containing a special
+	 * return variable {@code <ret>}.
+	 * </p>
+	 *
+	 * @throws UnsupportedOperationException if the native library is missing or
+	 *                                           if the creation of the initial
+	 *                                           state fails.
+	 */
 	public Apron() {
 		if (!isAvailable()) {
 			throw new UnsupportedOperationException("Failed to initialize Apron domain: native library missing.");
@@ -184,11 +272,38 @@ public class Apron
 		}
 	}
 
+	/**
+	 * Internal constructor used to create a new instance wrapping an existing
+	 * Apron native state.
+	 *
+	 * @param state the native {@link Abstract1} state to be wrapped.
+	 */
 	Apron(
 			Abstract1 state) {
 		this.state = state;
 	}
 
+	/**
+	 * Performs an abstract assignment of an expression to an identifier.
+	 * <p>
+	 * This method first ensures mathematical safety by calling
+	 * {@link #getConstraintsForDivision(Apron, ValueExpression, ProgramPoint, SemanticOracle)}
+	 * to split the state into safe partitions where no division by zero can
+	 * occur. Each safe partition is evaluated independently, and the final
+	 * result is the Least Upper Bound of all successful assignments.
+	 * </p>
+	 *
+	 * @param state      the current abstract state.
+	 * @param id         the identifier to which the expression is assigned.
+	 * @param expression the symbolic expression to evaluate.
+	 * @param pp         the program point where the assignment occurs.
+	 * @param oracle     the semantic oracle for inter-domain communication.
+	 * 
+	 * @return the updated abstract state after the assignment.
+	 * 
+	 * @throws SemanticException if an error occurs during the abstract
+	 *                               evaluation.
+	 */
 	@Override
 	public Apron assign(
 			Apron state,
@@ -256,6 +371,15 @@ public class Apron
 		return finalResult != null ? finalResult : bottom();
 	}
 
+	/**
+	 * Handles expressions that cannot be translated into Apron's tree
+	 * expressions.
+	 * <p>
+	 * It resets the knowledge of the identifier and assumes it could be any
+	 * value greater than or equal to zero, or less than or equal to zero,
+	 * effectively making it Unknown while keeping it in the environment.
+	 * </p>
+	 */
 	private Apron forgetAbstractionOf(
 			Abstract1 newState,
 			Identifier id,
@@ -282,6 +406,22 @@ public class Apron
 		return ge.lub(le);
 	}
 
+	/**
+	 * Translates a LiSA {@link SymbolicExpression} into an Apron
+	 * {@link Texpr1Node}.
+	 * <p>
+	 * This method recursively traverses the expression tree. It supports
+	 * identifiers, constants and binary operations.
+	 * </p>
+	 *
+	 * @param exp the LiSA symbolic expression.
+	 * 
+	 * @return the corresponding Apron tree expression node, or {@code null} if
+	 *             translation is not possible.
+	 * 
+	 * @throws ApronException if the native library encounters an error during
+	 *                            node creation.
+	 */
 	private Texpr1Node toApronExpression(
 			SymbolicExpression exp)
 			throws ApronException {
@@ -356,6 +496,14 @@ public class Apron
 		return null;
 	}
 
+	/**
+	 * Checks if a LiSA {@link BinaryOperator} has a direct mapping to an Apron
+	 * operator.
+	 *
+	 * @param op the binary operator to check.
+	 * 
+	 * @return {@code true} if a mapping exists, {@code false} otherwise.
+	 */
 	private boolean canBeConvertedToApronOperator(
 			BinaryOperator op) {
 		return op == StringConcat.INSTANCE
@@ -371,6 +519,17 @@ public class Apron
 				|| op == ComparisonGt.INSTANCE;
 	}
 
+	/**
+	 * Maps a LiSA {@link BinaryOperator} to its corresponding Apron numerical
+	 * or comparison operator code.
+	 *
+	 * @param op the LiSA binary operator.
+	 * 
+	 * @return the integer code representing the operator in Apron's
+	 *             {@link Texpr1BinNode} or {@link Tcons1}.
+	 * 
+	 * @throws UnsupportedOperationException if the operator is not supported.
+	 */
 	private int toApronOperator(
 			BinaryOperator op) {
 		if (op == StringConcat.INSTANCE || op == NumericNonOverflowingAdd.INSTANCE)
@@ -396,6 +555,27 @@ public class Apron
 
 	}
 
+	/**
+	 * Computes the small-step semantics of a given expression without actively
+	 * applying numerical constraints to the abstract state's bounds.
+	 * <p>
+	 * In the context of the Apron domain, this method's primary responsibility
+	 * is environment management. It traverses the expression to identify newly
+	 * referenced variables and registers them within the native Apron
+	 * environment, ensuring they are tracked for subsequent relational
+	 * operations.
+	 * </p>
+	 *
+	 * @param state      the current abstract state.
+	 * @param expression the symbolic expression being evaluated.
+	 * @param pp         the program point where the evaluation occurs.
+	 * @param oracle     the semantic oracle for inter-domain communication.
+	 * 
+	 * @return a new {@link Apron} instance containing the updated environment.
+	 * 
+	 * @throws SemanticException if an error occurs during the semantic
+	 *                               evaluation.
+	 */
 	@Override
 	public Apron smallStepSemantics(
 			Apron state,
@@ -439,6 +619,31 @@ public class Apron
 		return new Apron(state.state);
 	}
 
+	/**
+	 * Enforces a boolean condition on the current abstract state, restricting
+	 * its numerical boundaries.
+	 * <p>
+	 * This method acts as a mathematical filter (e.g., during the evaluation of
+	 * conditional branches like {@code if} or {@code while}). It translates the
+	 * given logical expression into native Apron constraints ({@link Tcons1})
+	 * and computes the intersection between the current state and these new
+	 * constraints. If the condition is mathematically impossible in the current
+	 * state, it returns the Bottom state.
+	 * </p>
+	 *
+	 * @param state      the current abstract state.
+	 * @param expression the boolean expression representing the condition to
+	 *                       assume.
+	 * @param src        the program point where the execution originates.
+	 * @param dest       the targeted program point after the assumption.
+	 * @param oracle     the semantic oracle for inter-domain communication.
+	 * 
+	 * @return a new restricted {@link Apron} state, or Bottom if the condition
+	 *             is unsatisfiable.
+	 * 
+	 * @throws SemanticException if an error occurs during the constraint
+	 *                               evaluation.
+	 */
 	@Override
 	public Apron assume(
 			Apron state,
@@ -538,6 +743,20 @@ public class Apron
 		return state;
 	}
 
+	/**
+	 * Checks whether the current abstract state tracks the specified
+	 * identifier.
+	 * <p>
+	 * This method queries the native Apron environment to determine if the
+	 * variable represented by the given identifier is currently defined and
+	 * bounded within the state.
+	 * </p>
+	 *
+	 * @param id the identifier to check.
+	 * 
+	 * @return {@code true} if the identifier is present in the environment,
+	 *             {@code false} otherwise (or if the identifier is null).
+	 */
 	@Override
 	public boolean knowsIdentifier(
 			Identifier id) {
@@ -552,35 +771,29 @@ public class Apron
 		}
 	}
 
-//	private Tcons1 toApronComparison(
-//			Apron state,
-//			BinaryExpression exp)
-//			throws ApronException {
-//		// Apron supports only "exp <comparison> 0", so we need to move
-//		// everything on the left node
-//		SymbolicExpression combinedExpr = new BinaryExpression(exp.getStaticType(), exp.getLeft(), exp.getRight(),
-//				NumericNonOverflowingSub.INSTANCE, exp.getCodeLocation());
-//		BinaryOperator op = exp.getOperator();
-//		if (op == ComparisonGt.INSTANCE
-//				|| op == ComparisonGe.INSTANCE
-//				|| op == ComparisonNe.INSTANCE
-//				|| op == ComparisonEq.INSTANCE) {
-//			Texpr1Node apronExpression = toApronExpression(combinedExpr);
-//			if (apronExpression != null)
-//				return new Tcons1(state.state.getEnvironment(), toApronOperator(exp.getOperator()), apronExpression);
-//			else
-//				throw new UnsupportedOperationException(
-//						"Comparison operator " + exp.getOperator() + " not yet supported");
-//		} else if (op == ComparisonLe.INSTANCE)
-//			return toApronComparison(state, new BinaryExpression(exp.getStaticType(), exp.getRight(), exp.getLeft(),
-//					ComparisonGe.INSTANCE, exp.getCodeLocation()));
-//		else if (op == ComparisonLt.INSTANCE)
-//			return toApronComparison(state, new BinaryExpression(exp.getStaticType(), exp.getRight(), exp.getLeft(),
-//					ComparisonGt.INSTANCE, exp.getCodeLocation()));
-//		else
-//			throw new UnsupportedOperationException("Comparison operator " + exp.getOperator() + " not yet supported");
-//	}
-
+	/**
+	 * Translates a LiSA comparison expression into a native Apron numerical
+	 * constraint.
+	 * <p>
+	 * The Apron library requires all constraints to be evaluated against zero
+	 * (e.g., {@code Expr = 0} or {@code Expr >= 0}). This method algebraically
+	 * rewrites standard comparisons to match this requirement. For instance,
+	 * {@code x == y} is translated to {@code x - y == 0}, and strict
+	 * inequalities like {@code x > y} are handled as {@code x - y - 1 >= 0}
+	 * (assuming integer semantics).
+	 * </p>
+	 *
+	 * @param state the current abstract state providing the environment.
+	 * @param exp   the binary expression representing the comparison.
+	 * 
+	 * @return the equivalent Apron tree constraint node ({@link Tcons1}).
+	 * 
+	 * @throws ApronException                if the native library encounters an
+	 *                                           error during constraint
+	 *                                           creation.
+	 * @throws UnsupportedOperationException if the comparison operator cannot
+	 *                                           be mapped or translated.
+	 */
 	private Tcons1 toApronComparison(
 			Apron state,
 			BinaryExpression exp)
@@ -655,6 +868,27 @@ public class Apron
 		}
 	}
 
+	/**
+	 * Evaluates the satisfiability of a boolean expression within the current
+	 * abstract state.
+	 * <p>
+	 * Unlike {@link #assume}, this method does not modify or restrict the
+	 * state. It merely queries the underlying Apron domain to check if the
+	 * given expression is definitively true (SATISFIED), definitively false
+	 * (NOT_SATISFIED), or if the state lacks sufficient precision to decide
+	 * (UNKNOWN).
+	 * </p>
+	 *
+	 * @param state      the current abstract state.
+	 * @param expression the boolean expression to evaluate.
+	 * @param pp         the program point where the evaluation occurs.
+	 * @param oracle     the semantic oracle for inter-domain communication.
+	 * 
+	 * @return a {@link Satisfiability} enum value representing the result of
+	 *             the query.
+	 * 
+	 * @throws SemanticException if an error occurs during the evaluation.
+	 */
 	@Override
 	public Satisfiability satisfies(
 			Apron state,
@@ -779,6 +1013,22 @@ public class Apron
 		}
 	}
 
+	/**
+	 * Computes the Least Upper Bound (LUB) of this state and another state.
+	 * <p>
+	 * This operation mathematically merges two abstract states. Since Apron
+	 * domains are generally convex, the resulting state is the smallest convex
+	 * geometric shape that fully encloses both input states. Before joining,
+	 * the environments of both states are unified to their Least Common
+	 * Environment.
+	 * </p>
+	 *
+	 * @param other the other abstract state to join with.
+	 * 
+	 * @return a new {@link Apron} state representing the least upper bound.
+	 * 
+	 * @throws SemanticException if an error occurs during the join operation.
+	 */
 	@Override
 	public Apron lub(
 			Apron other)
@@ -804,6 +1054,20 @@ public class Apron
 		}
 	}
 
+	/**
+	 * Computes the Greatest Lower Bound (GLB) of this state and another state.
+	 * <p>
+	 * This operation calculates the mathematical intersection of the two
+	 * abstract states. The resulting state satisfies the constraints of both
+	 * input states simultaneously.
+	 * </p>
+	 *
+	 * @param other the other abstract state to intersect with.
+	 * 
+	 * @return a new {@link Apron} state representing the greatest lower bound.
+	 * 
+	 * @throws SemanticException if an error occurs during the meet operation.
+	 */
 	@Override
 	public Apron glb(
 			Apron other)
@@ -821,6 +1085,22 @@ public class Apron
 		}
 	}
 
+	/**
+	 * Applies the widening operator between this state and another state.
+	 * <p>
+	 * Widening is crucial for ensuring the termination of the static analysis
+	 * in the presence of loops. If an interval or geometric bound grows between
+	 * iterations, the widening operator aggressively extrapolates it to
+	 * infinity to quickly reach a fixed point.
+	 * </p>
+	 *
+	 * @param other the abstract state from the subsequent iteration.
+	 * 
+	 * @return a new, widened {@link Apron} state.
+	 * 
+	 * @throws SemanticException if an error occurs during the widening
+	 *                               operation.
+	 */
 	@Override
 	public Apron widening(
 			Apron other)
@@ -841,6 +1121,22 @@ public class Apron
 		}
 	}
 
+	/**
+	 * Applies the narrowing operator between this state and another state.
+	 * <p>
+	 * Narrowing is typically used after a fixed point has been reached via
+	 * widening, in order to safely refine the over-approximated bounds and
+	 * recover lost precision. In this implementation, it defaults to the
+	 * Greatest Lower Bound.
+	 * </p>
+	 *
+	 * @param other the abstract state from the subsequent iteration.
+	 * 
+	 * @return a new, narrowed {@link Apron} state.
+	 * 
+	 * @throws SemanticException if an error occurs during the narrowing
+	 *                               operation.
+	 */
 	@Override
 	public Apron narrowing(
 			Apron other)
@@ -860,6 +1156,22 @@ public class Apron
 		}
 	}
 
+	/**
+	 * Checks if this abstract state is included in (or equal to) another state.
+	 * <p>
+	 * This is the partial order check of the abstract lattice. Geometrically,
+	 * it verifies if the shape represented by this state is completely
+	 * contained within the shape of the {@code other} state. It is primarily
+	 * used by the analyzer to determine if a fixed point has been reached.
+	 * </p>
+	 *
+	 * @param other the state to compare against.
+	 * 
+	 * @return {@code true} if this state is less than or equal to the other
+	 *             state, {@code false} otherwise.
+	 * 
+	 * @throws SemanticException if an error occurs during the inclusion check.
+	 */
 	@Override
 	public boolean lessOrEqual(
 			Apron other)
@@ -886,6 +1198,16 @@ public class Apron
 		}
 	}
 
+	/**
+	 * Returns the Top element of the abstract domain.
+	 * <p>
+	 * The Top state represents total lack of information or maximum uncertainty
+	 * (all variables can assume any possible value). It is the universal
+	 * over-approximation.
+	 * </p>
+	 *
+	 * @return a new {@link Apron} instance representing the Top state.
+	 */
 	@Override
 	public Apron top() {
 		try {
@@ -895,6 +1217,16 @@ public class Apron
 		}
 	}
 
+	/**
+	 * Returns the Bottom element of the abstract domain.
+	 * <p>
+	 * The Bottom state represents an unreachable program point or a
+	 * mathematical contradiction (the state resulting from an impossible
+	 * assumption or a guaranteed division by zero).
+	 * </p>
+	 *
+	 * @return a new {@link Apron} instance representing the Bottom state.
+	 */
 	@Override
 	public Apron bottom() {
 		try {
@@ -904,6 +1236,12 @@ public class Apron
 		}
 	}
 
+	/**
+	 * Checks if the current abstract state is the Bottom state.
+	 *
+	 * @return {@code true} if this state represents unreachable code or a
+	 *             contradiction, {@code false} otherwise.
+	 */
 	@Override
 	public boolean isBottom() {
 		try {
@@ -914,6 +1252,12 @@ public class Apron
 		}
 	}
 
+	/**
+	 * Checks if the current abstract state is the Top state.
+	 *
+	 * @return {@code true} if this state holds no specific constraints,
+	 *             {@code false} otherwise.
+	 */
 	@Override
 	public boolean isTop() {
 		try {
@@ -924,12 +1268,39 @@ public class Apron
 		}
 	}
 
+	/**
+	 * Converts a LiSA identifier into an Apron variable representation.
+	 * <p>
+	 * This utility method bridges the gap between LiSA's variable
+	 * representation ({@link Identifier}) and Apron's native string-based
+	 * variable format ({@link StringVar}).
+	 * </p>
+	 *
+	 * @param id the LiSA identifier to convert.
+	 * 
+	 * @return the corresponding Apron {@link Var}.
+	 */
 	private Var toApronVar(
 			Identifier id) {
 		String n = id.getName();
 		return new StringVar(n);
 	}
 
+	/**
+	 * Checks if the given LiSA identifier is currently tracked within the
+	 * abstract state's environment.
+	 * <p>
+	 * This method retrieves the active variables from the native Apron
+	 * environment and verifies the presence of the translated identifier. It is
+	 * often used to ensure a variable exists before attempting assignment or
+	 * forgetting operations.
+	 * </p>
+	 *
+	 * @param id the identifier to search for.
+	 * 
+	 * @return {@code true} if the identifier is part of the current
+	 *             environment, {@code false} otherwise.
+	 */
 	public boolean containsIdentifier(
 			Identifier id) {
 		return Arrays.asList(state.getEnvironment().getVars()).contains(toApronVar(id));
@@ -939,6 +1310,23 @@ public class Apron
 		return state;
 	}
 
+	/**
+	 * Projects the abstract state onto a smaller environment by forgetting a
+	 * specific set of identifiers.
+	 * <p>
+	 * This operation is equivalent to existential quantification in logic. It
+	 * safely removes the specified variables from the underlying Apron
+	 * environment, which is essential for performance and precision when
+	 * variables go out of scope.
+	 * </p>
+	 *
+	 * @param ids the collection of identifiers to remove from the state.
+	 * @param pp  the program point where the forgetting operation occurs.
+	 * 
+	 * @return a new {@link Apron} state without the specified identifiers.
+	 * 
+	 * @throws SemanticException if an error occurs during the operation.
+	 */
 	@Override
 	public Apron forgetIdentifiers(
 			Iterable<Identifier> ids,
@@ -975,6 +1363,16 @@ public class Apron
 		}
 	}
 
+	/**
+	 * Forgets a single identifier from the abstract state.
+	 *
+	 * @param id the identifier to remove.
+	 * @param pp the program point where the forgetting operation occurs.
+	 * 
+	 * @return a new {@link Apron} state without the specified identifier.
+	 * 
+	 * @throws SemanticException if an error occurs during the operation.
+	 */
 	@Override
 	public Apron forgetIdentifier(
 			Identifier id,
@@ -990,6 +1388,18 @@ public class Apron
 		}
 	}
 
+	/**
+	 * Provides a structured, human-readable representation of the abstract
+	 * state.
+	 * <p>
+	 * This representation is typically used for logging, debugging, or
+	 * outputting the final results of the static analysis. It handles special
+	 * cases like Top ("#TOP#") and Bottom ("_|_").
+	 * </p>
+	 *
+	 * @return a {@link StructuredRepresentation} wrapping the string output of
+	 *             the native Apron state.
+	 */
 	@Override
 	public StructuredRepresentation representation() {
 		if (isTop()) {
@@ -1001,6 +1411,22 @@ public class Apron
 		return new StringRepresentation(state.toString());
 	}
 
+	/**
+	 * Stores the value of a source identifier into a target identifier.
+	 * <p>
+	 * This represents a variable-to-variable assignment that updates the
+	 * environment and propagates existing bounds and relations to the new
+	 * variable.
+	 * </p>
+	 *
+	 * @param target the identifier that will receive the value.
+	 * @param source the identifier holding the value to store.
+	 * 
+	 * @return a new {@link Apron} state reflecting the storage operation.
+	 * 
+	 * @throws SemanticException if an error occurs (e.g., if the source is
+	 *                               missing from the environment).
+	 */
 	@Override
 	public Apron store(
 			Identifier target,
@@ -1018,7 +1444,7 @@ public class Apron
 
 			if (!env.hasVar(sourceName)) {
 				// variable doesn't exist in apron's env
-				throw new SemanticException("Error during store() metohd. Var '" + sourceName
+				throw new SemanticException("Error during store() method. Var '" + sourceName
 						+ "' does not exist in the current environment");
 			}
 
@@ -1033,11 +1459,28 @@ public class Apron
 		}
 	}
 
+	/**
+	 * Creates a new, default instance of the Apron abstract lattice.
+	 *
+	 * @return a new {@link Apron} instance.
+	 */
 	@Override
 	public Apron makeLattice() {
 		return new Apron();
 	}
 
+	/**
+	 * Forgets all identifiers from the abstract state that satisfy a given
+	 * predicate.
+	 *
+	 * @param test the predicate used to determine which identifiers should be
+	 *                 removed.
+	 * @param pp   the program point where the forgetting operation occurs.
+	 * 
+	 * @return a new {@link Apron} state with the matching identifiers removed.
+	 * 
+	 * @throws SemanticException if an error occurs during the operation.
+	 */
 	@Override
 	public Apron forgetIdentifiersIf(
 			Predicate<Identifier> test,
@@ -1081,6 +1524,22 @@ public class Apron
 		}
 	}
 
+	/**
+	 * Recursively traverses a value expression tree to identify and extract all
+	 * sub-expressions that act as denominators.
+	 * <p>
+	 * This method inspects unary and binary operations, specifically looking
+	 * for division, modulo, and remainder operators
+	 * ({@link NumericNonOverflowingDiv}, {@link NumericNonOverflowingMod},
+	 * {@link NumericNonOverflowingRem}). It isolates their right-hand operands
+	 * to be later evaluated for division-by-zero risks.
+	 * </p>
+	 *
+	 * @param expression the symbolic expression tree to explore.
+	 * 
+	 * @return a list of {@link ValueExpression} representing all found
+	 *             denominators.
+	 */
 	private List<ValueExpression> extractDenominators(
 			ValueExpression expression) {
 		List<ValueExpression> denominators = new ArrayList<>();
@@ -1102,6 +1561,33 @@ public class Apron
 		return denominators;
 	}
 
+	/**
+	 * Generates a set of mathematically safe abstract states where division by
+	 * zero is strictly impossible for the given expression.
+	 * <p>
+	 * This method extracts all denominators from the expression and evaluates
+	 * their bounds. If a denominator's abstract interval includes zero (i.e.,
+	 * its minimum is &le; 0 and its maximum is &ge; 0), the method performs a
+	 * safe state partition. It forces assumptions to create two distinct
+	 * universes: one where the denominator is strictly negative ({@code < 0})
+	 * and one where it is strictly positive ({@code > 0}). The process is
+	 * iterative, producing a Cartesian product of safe states for expressions
+	 * with multiple risky denominators.
+	 * </p>
+	 *
+	 * @param initialState the initial abstract state before evaluation.
+	 * @param expression   the complete symbolic expression containing potential
+	 *                         divisions.
+	 * @param pp           the current program point.
+	 * @param oracle       the semantic oracle for cross-domain queries.
+	 * 
+	 * @return a set of safe {@link Apron} states. If a denominator is
+	 *             guaranteed to be zero, the returned set will naturally filter
+	 *             out the Bottom states, potentially returning empty.
+	 * 
+	 * @throws SemanticException if an error occurs during the assumption of the
+	 *                               strict constraints.
+	 */
 	private Set<Apron> getConstraintsForDivision(
 			Apron initialState,
 			ValueExpression expression,
