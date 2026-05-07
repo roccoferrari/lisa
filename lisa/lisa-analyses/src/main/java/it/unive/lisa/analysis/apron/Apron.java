@@ -448,19 +448,7 @@ public class Apron
 
 		if (exp instanceof UnaryExpression) {
 			return null;
-			// UnaryExpression un = (UnaryExpression) exp;
-			// UnaryOperator op = un.getOperator();
-			// if (op == LogicalNegation.INSTANCE)
-			// break;
-			// else if (op == NumericNegation.INSTANCE)
-			// break;
-			// else if (op == StringLength.INSTANCE)
-			// break;
-			// else if (op == TypeOf.INSTANCE)
-			// break;
-			// else
-			// break;
-		}
+        }
 
 		if (exp instanceof BinaryExpression) {
 			BinaryExpression bin = (BinaryExpression) exp;
