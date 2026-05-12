@@ -184,7 +184,10 @@ public class Apron
 		 * The Parma Polyhedra library convex polyhedra domain Compile Apron
 		 * with the specific flag for PPL set to 1 in order to use such domain.
 		 */
-		PplPoly
+		PplPoly,
+
+		/** PPLite domains */
+		Pplite
 	}
 
 	/**
@@ -231,6 +234,15 @@ public class Apron
 			} catch (LinkageError | Exception e) {
 				throw new UnsupportedOperationException(
 						"Failed to initialize PplPoly. Ensure the PPL library is installed and Apron was compiled with PPL support.",
+						e);
+			}
+			break;
+		case Pplite:
+			try {
+				manager = new apron.Pplite(false);
+			} catch (LinkageError | Exception e) {
+				throw new UnsupportedOperationException(
+						"Failed to initialize Pplite. Ensure the PPLite library is installed and Apron was compiled with PPLite support.",
 						e);
 			}
 			break;
