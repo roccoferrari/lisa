@@ -448,7 +448,7 @@ public class Apron
 
 		if (exp instanceof UnaryExpression) {
 			return null;
-        }
+		}
 
 		if (exp instanceof BinaryExpression) {
 			BinaryExpression bin = (BinaryExpression) exp;
