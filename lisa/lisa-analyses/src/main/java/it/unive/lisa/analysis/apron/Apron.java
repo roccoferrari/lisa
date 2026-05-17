@@ -1,6 +1,7 @@
 package it.unive.lisa.analysis.apron;
 
 import apron.*;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import gmp.Mpfr;
 import it.unive.lisa.analysis.ScopeToken;
 import it.unive.lisa.analysis.SemanticException;
@@ -324,6 +325,46 @@ public class Apron
 			ProgramPoint pp,
 			SemanticOracle oracle)
 			throws SemanticException {
+
+        if (expression instanceof UnaryExpression
+            && ((UnaryExpression) expression).getOperator() == NumericAbs.INSTANCE) {
+            ValueExpression innerExp = (ValueExpression) ((UnaryExpression) expression).getExpression();
+            Constant zero = new Constant(Untyped.INSTANCE, 0, expression.getCodeLocation());
+
+            // >=0
+            BinaryExpression geqZero = new BinaryExpression(
+                    innerExp.getStaticType(),
+                    innerExp,
+                    zero,
+                    ComparisonGe.INSTANCE,
+                    expression.getCodeLocation()
+            );
+
+            Apron statePos = assume(state, geqZero, pp, pp, oracle);
+            Apron assignedPos = statePos.assign(state, id, innerExp, pp, oracle);
+
+            // <0
+            BinaryExpression ltZero = new BinaryExpression(
+                    innerExp.getStaticType(),
+                    innerExp,
+                    zero,
+                    ComparisonLt.INSTANCE,
+                    expression.getCodeLocation()
+            );
+
+            UnaryExpression negInner = new UnaryExpression(
+                    innerExp.getStaticType(),
+                    innerExp,
+                    NumericNegation.INSTANCE,
+                    expression.getCodeLocation()
+            );
+
+            Apron stateNeg = assume(state, ltZero, pp, pp, oracle);
+            Apron assignedNeg = stateNeg.assign(state, id, negInner, pp, oracle);
+
+            // + U -
+            return assignedPos.lub(assignedNeg);
+        }
 
 		Set<Apron> safeStates = getConstraintsForDivision(state, expression, pp, oracle);
 
