@@ -13,7 +13,7 @@ import it.unive.lisa.program.cfg.ProgramPoint;
 import it.unive.lisa.symbolic.SymbolicExpression;
 import it.unive.lisa.symbolic.value.*;
 import it.unive.lisa.symbolic.value.operator.binary.*;
-import it.unive.lisa.symbolic.value.operator.unary.LogicalNegation;
+import it.unive.lisa.symbolic.value.operator.unary.*;
 import it.unive.lisa.type.Untyped;
 import it.unive.lisa.util.representation.StringRepresentation;
 import it.unive.lisa.util.representation.StructuredRepresentation;
@@ -459,7 +459,21 @@ public class Apron
 		}
 
 		if (exp instanceof UnaryExpression) {
-			return null;
+			UnaryExpression un = (UnaryExpression) exp;
+            UnaryOperator op = (UnaryOperator) un.getOperator();
+
+            Texpr1Node rewrittenExp = toApronExpression((SymbolicExpression) un.getExpression());
+            if (rewrittenExp == null)
+                return null;
+
+            // Operators mapping - apron supports only OP_NEG, OP_SQRT, OP_CAST
+            if (op == NumericNegation.INSTANCE) {
+                return new Texpr1UnNode(Texpr1UnNode.OP_NEG, Texpr1UnNode.RTYPE_INT, Texpr1UnNode.RDIR_ZERO, rewrittenExp);
+            } else if (op == NumericSqrt.INSTANCE) {
+                return new Texpr1UnNode(Texpr1UnNode.OP_SQRT, Texpr1UnNode.RTYPE_INT, Texpr1UnNode.RDIR_ZERO, rewrittenExp);
+            }
+
+            return null;
 		}
 
 		if (exp instanceof BinaryExpression) {
@@ -488,7 +502,13 @@ public class Apron
 					// we are not able to translate the expression
 					return null;
 
-				return new Texpr1BinNode(toApronOperator(bin.getOperator()), rewrittenLeft, rewrittenRight);
+                return new Texpr1BinNode(
+                        toApronOperator(bin.getOperator()),
+                        Texpr1BinNode.RTYPE_INT,
+                        Texpr1BinNode.RDIR_ZERO,
+                        rewrittenLeft,
+                        rewrittenRight
+                );
 			}
 		}
 
@@ -516,6 +536,30 @@ public class Apron
 				|| op == ComparisonEq.INSTANCE
 				|| op == ComparisonNe.INSTANCE
 				|| op == ComparisonGe.INSTANCE
+                || op == Numeric8BitAdd.INSTANCE
+                || op == Numeric16BitAdd.INSTANCE
+                || op == Numeric32BitAdd.INSTANCE
+                || op == Numeric64BitAdd.INSTANCE
+                || op == Numeric8BitMul.INSTANCE
+                || op == Numeric16BitMul.INSTANCE
+                || op == Numeric32BitMul.INSTANCE
+                || op == Numeric64BitMul.INSTANCE
+                || op == Numeric8BitSub.INSTANCE
+                || op == Numeric16BitSub.INSTANCE
+                || op == Numeric32BitSub.INSTANCE
+                || op == Numeric64BitSub.INSTANCE
+                || op == Numeric8BitDiv.INSTANCE
+                || op == Numeric16BitDiv.INSTANCE
+                || op == Numeric32BitDiv.INSTANCE
+                || op == Numeric64BitDiv.INSTANCE
+                || op == Numeric8BitMod.INSTANCE
+                || op == Numeric16BitMod.INSTANCE
+                || op == Numeric32BitMod.INSTANCE
+                || op == Numeric64BitMod.INSTANCE
+                || op == Numeric8BitRem.INSTANCE
+                || op == Numeric16BitRem.INSTANCE
+                || op == Numeric32BitRem.INSTANCE
+                || op == Numeric64BitRem.INSTANCE
 				|| op == ComparisonGt.INSTANCE;
 	}
 
@@ -532,15 +576,46 @@ public class Apron
 	 */
 	private int toApronOperator(
 			BinaryOperator op) {
-		if (op == StringConcat.INSTANCE || op == NumericNonOverflowingAdd.INSTANCE)
+		if (op == StringConcat.INSTANCE
+                || op == NumericNonOverflowingAdd.INSTANCE
+                || op == Numeric8BitAdd.INSTANCE
+                || op == Numeric16BitAdd.INSTANCE
+                || op == Numeric32BitAdd.INSTANCE
+                || op == Numeric64BitAdd.INSTANCE
+        )
 			return Texpr1BinNode.OP_ADD;
-		else if (op == NumericNonOverflowingMul.INSTANCE)
+		else if (op == NumericNonOverflowingMul.INSTANCE
+                || op == Numeric8BitMul.INSTANCE
+                || op == Numeric16BitMul.INSTANCE
+                || op == Numeric32BitMul.INSTANCE
+                || op == Numeric64BitMul.INSTANCE
+        )
 			return Texpr1BinNode.OP_MUL;
-		else if (op == NumericNonOverflowingSub.INSTANCE)
+		else if (op == NumericNonOverflowingSub.INSTANCE
+                || op == Numeric8BitSub.INSTANCE
+                || op == Numeric16BitSub.INSTANCE
+                || op == Numeric32BitSub.INSTANCE
+                || op == Numeric64BitSub.INSTANCE
+        )
 			return Texpr1BinNode.OP_SUB;
-		else if (op == NumericNonOverflowingDiv.INSTANCE)
+		else if (op == NumericNonOverflowingDiv.INSTANCE
+                || op == Numeric8BitDiv.INSTANCE
+                || op == Numeric16BitDiv.INSTANCE
+                || op == Numeric32BitDiv.INSTANCE
+                || op == Numeric64BitDiv.INSTANCE
+        )
 			return Texpr1BinNode.OP_DIV;
-		else if (op == NumericNonOverflowingMod.INSTANCE || op == NumericNonOverflowingRem.INSTANCE)
+		else if (op == NumericNonOverflowingMod.INSTANCE
+                || op == NumericNonOverflowingRem.INSTANCE
+                || op == Numeric8BitMod.INSTANCE
+                || op == Numeric16BitMod.INSTANCE
+                || op == Numeric32BitMod.INSTANCE
+                || op == Numeric64BitMod.INSTANCE
+                || op == Numeric8BitRem.INSTANCE
+                || op == Numeric16BitRem.INSTANCE
+                || op == Numeric32BitRem.INSTANCE
+                || op == Numeric64BitRem.INSTANCE
+        )
 			return Texpr1BinNode.OP_MOD;
 		else if (op == ComparisonEq.INSTANCE)
 			return Tcons1.EQ;
